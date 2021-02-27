@@ -82,7 +82,7 @@
 612;Barnehage;building=kindergarten;amenity=kindergarten;Sted for opphold for barn 1 - 5 år. Kan være heldag og halvdag, og det er knyttet et visst pedagogisk innhold til oppholdet. Selve barnehagebygningen er ofte velutstyrt, med flere avdelinger, spiserom/hvilerom for de ansatte og kjøkken. Styrt av Barnehageloven
 613;Barneskole;building=school;amenity=school + isced:level=1;Skolebygning for skoleklassene 1-7, for barn i alderen 6-12 år.
 614;Ungdomsskole;building=school;amenity=school + isced:level=2;Skolebygning for skoleklassene 8-10, for barn i alderen 13-15 år.
-615;Kombinert barne- og ungdomsskole;building=school;"amenity=school + isced:level=1;2";Skolebygning for skoleklassene 1-10, for barn i alderen 6-15 år.
+615;Kombinert barne- og ungdomsskole;building=school;amenity=school + isced:level=1-2;Skolebygning for skoleklassene 1-10, for barn i alderen 6-15 år.
 616;Videregående skole;building=school;amenity=school + isced:level=3;Skolebygning for skole etter grunnskolen. Allmennfaglig eller yrkesrettet.Ikke høgskole
 619;Annen skolebygning;building=school;amenity=school;Andre skoler som ikke passer inn under ovennevnte kategorier, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).  
 621;Universitet, høgskole m/auditorie,lesesal mv.;building=university;amenity=university;Universitets- og høgskolebygning med integrerte funksjoner, auditorium, lesesal mv. 
