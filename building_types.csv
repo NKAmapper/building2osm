@@ -7,7 +7,7 @@
 123;Våningshus tomannsbolig - vertikaldelt;building=farm;;Dette gjelder bolighus med to boliger, inkl. våningshus på gårdsbruk. Tomannsboligen kan i tillegg inneholde en eller  flere hybler eller lignende som minimum dekkes av SSB`s krav til hybel. (Bygningen må framstå som en tomannsbolig).En tomannsbolig kan ha vertikalt eller horisontalt boligskille. Vertikaldelt tomannsbolig skal ha to bygningspunkt i GAB. Bygningen er frittliggende, og boligene kan ha separat eller felles inngang. 
 124;Våningshus tomannsbolig - horisontaldelt;building=farm;;Dette gjelder bolighus med to boliger, inkl. våningshus på gårdsbruk. Tomannsboligen kan i tillegg inneholde en eller  flere hybler eller lignende som minimum dekkes av SSB`s krav til hybel. (Bygningen må framstå som en tomannsbolig).En tomannsbolig kan ha vertikalt eller horisontalt boligskille. Vertikaldelt tomannsbolig skal ha to bygningspunkt i GAB. Bygningen er frittliggende, og boligene kan ha separat eller felles inngang.
 131;Rekkehus;building=semidetached_house;;Rekkehus:Rekkehus har vertikale gjennomgående felles boligskiller og hver boligenhet skal ligge på grunnen. Rekkehus skal ikke inneholde fellesareal for eksempel tilboder eller garasje. Et rekkehus må bestå av minimum 3 boliger, den enkeltebolig har ofte 1 - 3 etasjer og separat inngang. Hver enkelt del skal ha egetbygningspunkt i GAB.
-133;Kjede-, atriumhus;building=residential;;Kjedehus: Kjedehus har vertikale boligskiller der de enkelte boligenhetene er kjedetsammen med mellombygninger, ofte garasjer eller boder. Et kjedehus må bestå avminimum 2 boliger, den enkelte bolig har ofte 1 - 3 etasjer og separat inngang. Hver enkelt del skal ha eget bygningspunkt i GAB. Kjedehus benevnes også oftesom eneboliger i kjede.  Atriumhus: Betegnelsenatriumhusbenyttes om sammenbygde hus ivinkelform. Ved hjelp av de tilstøtende ytterveggene på nabohusene og/ellerlevegger får hvert enkelt hus et skjermet og innelukket uteareal/hage.
+133;Kjede-, atriumhus;building=semidetached_house;;Kjedehus: Kjedehus har vertikale boligskiller der de enkelte boligenhetene er kjedetsammen med mellombygninger, ofte garasjer eller boder. Et kjedehus må bestå avminimum 2 boliger, den enkelte bolig har ofte 1 - 3 etasjer og separat inngang. Hver enkelt del skal ha eget bygningspunkt i GAB. Kjedehus benevnes også oftesom eneboliger i kjede.  Atriumhus: Betegnelsenatriumhusbenyttes om sammenbygde hus ivinkelform. Ved hjelp av de tilstøtende ytterveggene på nabohusene og/ellerlevegger får hvert enkelt hus et skjermet og innelukket uteareal/hage.
 135;Terrassehus;building=terrace;;Et størrebolighus i bratt terreng hvor bygningen følger hellingen i terrenget. De enkelteboligene blir dermed avtrappet eller forskjøvet i forhold til hverandre, slik atde får terrasse på taket til boligen under. Terrassehus er vanligvis ikkeavhengig av felles inngang og felles trappehus.
 136;Andre småhus med 3 boliger eller flere;building=apartments;;Andre småhus med 3 boliger eller flere
 141;Stort frittliggende boligbygg på 2 etg;building=apartments;;Stort frittliggende boligbygg på 2 etasjer (5 boliger eller mer)
@@ -40,13 +40,13 @@
 231;Lagerhall;building=warehouse;;Lagerhall
 232;Kjøle og fryselager;building=warehouse;;Kjøle- og fryselager
 233;Silobygning;building=warehouse;man_made=silo;Silobygning
-239;Annen lagerbygning;building=shed;;Annen lagerbygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er)
+239;Annen lagerbygning;building=warehouse;;Annen lagerbygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er)
 241;Hus for dyr/landbruk, lager/silo;building=barn;;Hus for dyr, fôrlager, strølager, landbrukssilo, høy-/korntørke
 243;Veksthus;building=greenhouse;;Veksthus
 244;Driftsbygning fiske/fangst/oppdrett;building=yes;;Driftsbygning for fiske og fangst, inkl. oppdrettsanlegg 
 245;Naust, redskapshus for fiske;building=yes;;
 248;Annen fiskeri- og fangstbygning;building=yes;;Annen fiskeri- og fangstbygning 
-249;Annen landbruksbygning;building=yes;;Annen landbruksbygning
+249;Annen landbruksbygning;building=barn;;Annen landbruksbygning
 311;Kontor- og administrasjonsbygning , rådhus.;building=office;;Kontor- og administrasjonsbygning er en bygning for administrasjon, planlegging og annet tjenesteytende arbeid, både offentlig og privat.
 312;Bankbygning, posthus;building=retail;amenity=bank;Bankbygning, posthus 
 313;Mediabygning;building=office;;Hus for produksjon og distribusjon/kringkasting av medieprodukter (aviser, radio og TV)
@@ -54,13 +54,13 @@
 321;Kjøpesenter, varehus;building=retail;shop=mall;En bygning som inneholder flere forskjellige butikker.
 322;Butikkbygning;building=retail;;
 323;Bensinstasjon;building=retail;amenity=fuel_station;Bensinstasjon
-329;Annen forretningsbygning;building=commerical;;Annen forretningsbygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er)
-330;Messe og kongressbygning;building=commerical;amenity=conference_centre;Dette gjelder bygninger for messer, utstillinger, kongresser og konferanser. 
+329;Annen forretningsbygning;building=commercial;;Annen forretningsbygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er)
+330;Messe og kongressbygning;building=commercial;amenity=conference_centre;Dette gjelder bygninger for messer, utstillinger, kongresser og konferanser. 
 411;Ekspedisjonsbygning, flyterminal, kontrolltårn;building=transportation;;
 412;Jernbane og T-banestasjon;building=train_station;;
 415;Godsterminal;building=warehouse;;Godsterminal
-416;Postterminal;building=industrial;amenity=post_depot;Postterminal
-419;Annen ekspedisjons- og terminalbygning;budilng=transportation;;
+416;Postterminal;building=commercial;amenity=post_depot;Postterminal
+419;Annen ekspedisjons- og terminalbygning;building=transportation;;
 429;Telekommunikasjonsbygning;building=office;telecom=exchange;
 431;Parkeringshus;building=parking;amenity=parking;Parkeringshus
 439;Annen garasje- /hangarbygning;building=yes;;Annen garasje- og hangarbygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er)
@@ -72,7 +72,7 @@
 521;Hospits, pensjonat;building=hotel;tourism=guest_house;"Rimelig, enkelt utstyrt overnattingssted, vanligvis serveres også mat. I byene ofte leid ut på mer fast basis; over uker, måneder eller år."
 522;Vandrer-, feriehjem;building=hotel;tourism=hostel;Vandrerhjem, feriehjem/-koloni , turisthytte  Vandrerhjem - rimelig nattelosji, ofte knyttet til medlemskap i en forening.  Feriehjem/-koloni : Sted med formål å skaffe barn et sunt og styrkende ferieopphold og anledning til friluftsliv i samvær med andre barn.  Turisthytte : Opprinnelig turiststasjon, fjellstue, skysstasjon, ofte kombinert med annen næring som gårdsbruk eller vertshus. Brukes også om hytter knyttet til turistforeningens løypenett, der de fleste er betjente, men også noen ubetjente hytter.
 523;Appartement;building=apartments;tourism=apartment;Bygning med fritidsboliger/ boliger til utleie, boligene har bad og kokemuligheter, og leies oftest for døgn- eller ukebasis.  Moderne varianter er ofte knyttet til en sentral ekspedisjon med forretning og av og til restaurant.  Opprinnelig basert på at man skal ha med sengetøy og stelle mat selv. Boligene registreres med lokalekode A (annet enn bolig). Det skal ikke registreres bruksareal til bolig.
-524;Camping/utleiehytte;building=hut;tourism=chalet;Campinghytte : En enklere overnattingshytte fortrinnsvis beregnet for bilturister. Som regel er de knyttet til en campingplass.  Gjestene holder vanligvis sengetøy selv.  Utleiehytte : Et lite hus med høy, middels eller lav standard, til midlertidig opphold.  Oftest større og bedre standard enn en campinghytte, ofte ikke beliggende på en campingplass, men mer spredt i terrenget.  Moderne utleiehytter har ofte høy standard og flere er ofte knyttet til et senter med vakt, kiosk/forretning og andre fasiliteter.
+524;Camping/utleiehytte;building=bungalow;tourism=chalet;Campinghytte : En enklere overnattingshytte fortrinnsvis beregnet for bilturister. Som regel er de knyttet til en campingplass.  Gjestene holder vanligvis sengetøy selv.  Utleiehytte : Et lite hus med høy, middels eller lav standard, til midlertidig opphold.  Oftest større og bedre standard enn en campinghytte, ofte ikke beliggende på en campingplass, men mer spredt i terrenget.  Moderne utleiehytter har ofte høy standard og flere er ofte knyttet til et senter med vakt, kiosk/forretning og andre fasiliteter.
 529;Annen bygning for overnatting;building=yes;;Andre bygninger som ikke kan plasseres i de underpunktene nevnt over, men som er bygning for overnatting, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).
 531;Restaurantbygning, kafebygning;building=retail;amenity=restaurant;Restaurantbygning : Offentlig spisested, som i følge Hotelloven må ha godkjent restaurant-bevilling.  Dette krever et visst driftsmessig og utstyrsmessig nivå.  Kafé : Bevertningssted der det blir solgt kaffe/te, øl, andre drikker, smørbrød og annen enkel mat.
 532;Sentralkjøkken, kantinebygning;building=retail;;Bygning for kjøkken eller kantine tilknyttet større enhet, men der bygningen ligger for seg selv.
@@ -92,20 +92,20 @@
 642;Bibliotek, mediatek;building=civic;amenity=library;Bygning for utlån av bøker, lydbøker, filmer, aviser o.l.  Moderne bibliotek/mediatek har ofte tilgjengelig PC gjerne med Internett-tilknytning.
 643;Zoologisk og botanisk hage;building=civic;leisure=garden + garden:type=botanical;Bygninger i tilknytning til zoologisk og botanisk hage, gjelder også utstillingsbygninger i dyrepark. 
 649;Annen museums- og biblioteksbygning;building=civic;;Bygninger som ikke passer inn under ovennevnte kategorier , eller bygning som har nær tilknytning til/tjener slik(e) bygning(er). 
-651;Idrettshall;building=sports_hall;leisure=sports_centre;Bygning primært til bruk for idrettsformål, innehar som regel også garderobeanlegg og kiosk.
-652;Ishall;building=sports_hall;leisure=ice_rink + building=yes;Bygning primært brukt som skøytehall for lengdeløp og ishockey, innehar som regel også garderobeanlegg og kiosk.  Ishallene er ofte ikke islagt mer enn halve året,  resten av tiden brukes den gjerne til andre idrettsarrangementer, friidrett, ulike turneringer o.l. eller den kan brukes til messer o.l.
-653;Svømmehall;building=sports_hall;leisure=swimming_pool + building=yes;Bygning for innendørs badeanlegg som brukes til undervisning, mosjon, trening og konkurranser.
-654;Tribune og idrettsgarderobe;building=sports_hall;;Tribune : Innebygd tribuneanlegg til utendørs idrettsanlegg  Idrettsgarderobe : Bygning for garderobe i tilknytning til idrettsanlegg.
-655;Helsestudio;building=sports_hall;leisure=fitness_centre;Kompakt treningsanlegg, drevet på forretningsmessig basis - ikke offentlig.  Moderne studioer har ofte muligheter for apparattrening, squash, aerobic, massasje og andre mer eller mindre organiserte aktiviteter.
+651;Idrettshall;building=sports_centre;leisure=sports_centre;Bygning primært til bruk for idrettsformål, innehar som regel også garderobeanlegg og kiosk.
+652;Ishall;building=sports_centre;leisure=ice_rink + building=sports_centre;Bygning primært brukt som skøytehall for lengdeløp og ishockey, innehar som regel også garderobeanlegg og kiosk.  Ishallene er ofte ikke islagt mer enn halve året,  resten av tiden brukes den gjerne til andre idrettsarrangementer, friidrett, ulike turneringer o.l. eller den kan brukes til messer o.l.
+653;Svømmehall;building=sports_centre;leisure=swimming_pool + building=sports_centre;Bygning for innendørs badeanlegg som brukes til undervisning, mosjon, trening og konkurranser.
+654;Tribune og idrettsgarderobe;building=yes;;Tribune : Innebygd tribuneanlegg til utendørs idrettsanlegg  Idrettsgarderobe : Bygning for garderobe i tilknytning til idrettsanlegg.
+655;Helsestudio;building=sports_centre;leisure=fitness_centre;Kompakt treningsanlegg, drevet på forretningsmessig basis - ikke offentlig.  Moderne studioer har ofte muligheter for apparattrening, squash, aerobic, massasje og andre mer eller mindre organiserte aktiviteter.
 659;Annen idrettsbygning;building=yes;leisure=sports_centre;Andre idrettsbygninger som ikke passer inn under ovennevnte kategorier , eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).  
 661;Kinobygning, teaterbygning, opera/konserthus.;building=civic;leisure=theatre ;Bygning for framføring av kino, teater, opera og konserter.
 662;Samfunnshus , grendehus.;building=civic;amenity=community_centre;Sentralt aktivitetshus for bygda/grenda,  multifunksjonsbygg som benyttes til alt fra idrettsarrangementer til fest og andre sosiale sammenkomster.
 663;Diskotek;building=retail;amenity=nightclub;Bygning for ungdomsaktiviteter, særlig knyttet til musikk og dans - drevet på forretningsmessig basis.
-669;Annet kulturhus;building=yes;amenity=community_centre;Andre multifunksjonshus for kultur og idrett, herunder ungdomsklubb, som ikke passer inn under ovennevnte kategorier , eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).
+669;Annet kulturhus;building=civic;amenity=community_centre;Andre multifunksjonshus for kultur og idrett, herunder ungdomsklubb, som ikke passer inn under ovennevnte kategorier , eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).
 671;Kirke , kapell;building=church;amenity=place_of_worship + religion=christian + building=church;Kristent gudshus
 672;Bedehus , menighetshus;building=chapel;amenity=place_of_worship + religion=christian + building=chapel;Kristent forsamlingshus
 673;Krematorium, gravkapell, bårehus;building=chapel;amenity=worship_of_god + religion=christianity + building=chapel;Krematorium : Bygning for likbrenning.  Gravkapell  og bårehus: Bygning for oppbevaring av døde mennesker inntil begravelse og kremasjon.
-674;Synage og moske;building=mosque;amenity=place_of_worship + religion=muslim + building=mosque;Synagoge :  Jødisk Gudshus Moské :  Muslimsk Gudshus
+674;Synage og moske;building=church;amenity=place_of_worship + religion=muslim + building=mosque;Synagoge :  Jødisk Gudshus Moské :  Muslimsk Gudshus
 675;Kloster;building=chapel;amenity=monastery;Bygning der menn eller kvinner har trukket seg tilbake for å virkeliggjøre det religiøse ideal, i et lukket samfunn, og etter en bestemt regel.
 679;Annen bygninger for religiøse aktiviteter;building=religious;amenity=place_of_worship + religion=christian + building=religious;Bygninger som ikke passer inn under ovennevnte kategorier, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er). 
 719;Sykehus;building=hospital;amenity=hospital ;Dette gjelder bygninger for lokalsykehus, sentralsykehus, regionsykehus og universitetssykehus.  Typen omfatter også spesialsykehus, f.eks. psykiatriske sykehus, rehabiliteringssykehus, reumatiske sykehus, kreftsykehus o.a.
@@ -113,16 +113,16 @@
 722;Bo- og behandlingssenter;building=civic;amenity=social_facility + social_facility=assisted_living;Institusjoner der man bor permanent og samtidig har tilgang til et behandlingstilbud.
 723;Rehabiliteringsinstitusjon, kurbad.;building=civic;healthcare=rehabilitation;Institusjon der man bor for en kortere eller lengre periode, samtidig som man får behandling.
 729;Annet sykehjem;building=civic;amenity=social_facility;Annet sykehjem, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).
-731;Klinikk, legekontor/-senter/-vakt/dyresykehus;building=commerical;amenity=doctors ;Klinikk kan vere private sykehus, men også tannklinikker o.l.
+731;Klinikk, legekontor/-senter/-vakt/dyresykehus;building=commercial;amenity=doctors ;Klinikk kan vere private sykehus, men også tannklinikker o.l.
 732;Helse- og sosialsenter, helsestasjon;building=civic;amenity=doctors;Senter som inneholderflere tilbud som f.eks. fysioterapi, kiroprakti, akupunktur, alternative behandlingsformer etc.
 739;Annen primærhelsebygning;building=civic;healthcare=yes;Annen primærhelsebygning eller bygning som har nær tilknytning til/tjener slik(e) bygning(er). 
 819;Fengselsbygning;building=prison;amenity=prison ;Fengselsbygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er)
 821;Politistasjon;building=public;amenity=police;
 822;Brannstasjon, ambulansestasjon;building=fire_station;amenity=fire_station;
-823;Fyrstasjon, losstasjon;building=public;;
-824;Stasjon for radarovervåkning av fly- og/eller skipstrafikk;building=public;;
+823;Fyrstasjon, losstasjon;building=yes;;
+824;Stasjon for radarovervåkning av fly- og/eller skipstrafikk;building=yes;;
 825;Tilfluktsrom / bunker;building=bunker;military=bunker;
-829;Annen beredskapsbygning;building=public;;Annen beredskapsbygning eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).  
+829;Annen beredskapsbygning;building=service;;Annen beredskapsbygning eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).  
 830;Monument;building=civic;historic=monument ;Dette gjelder konstruksjoner som er minnesmerker eller kunstverker. Må tilfredsstille krav til bygning. 
 840;Offentlig toalett;building=toilets;;Dette gjelder bygninger som per definisjon er klassifisert under hovedtype 8 (fengselsbygning, beredskapsbygning mv.), men som ikke naturlig hører inn under én av de ovennevnte bygningstypene.
 956;Turisthytter;building=hotel;tourism=alpine_hut;
