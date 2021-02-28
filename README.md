@@ -1,5 +1,7 @@
 # building2osm
-Generates import files for OpenStreetMap with buliding footprints from Kartverket
+Generates import files for OpenStreetMap with buliding footprints from Kartverket.
+
+_Please note that the import plan has not yet been reviewed, so please do not import any buildings to OSM._
 
 #### Usage
 
@@ -20,7 +22,7 @@ Parameters:
   * Polygons which are almost square are rectified (orthogonalized) to get exact 90 degrees corners. Groups of connected buildings are rectified as a group. Multipolygons are cupported. A polygon is not rectified if it would relocate one of its nodes by more than 20 centimeters.
   * Redundant nodes are removed if they are located on an (almost) straight line.
   * Curved walls are being preserved.
-* Output is stored in a geosjon file which may be loaded into JOSM when the OpenData plugin has been installed. Please read the [mport plan](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Norway_Building_Import) for guiding on how to do the import.
+* Output is stored in a geosjon file which may be loaded into JOSM when the OpenData plugin has been installed. Please read the [import plan](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Norway_Building_Import) for guiding on how to do the import.
 
 #### References
 
