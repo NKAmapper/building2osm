@@ -22,7 +22,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.2.0"
+version = "0.2.1"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -93,30 +93,6 @@ def distance (point1, point2):
 
 
 
-# Calculate centroid of polygon
-# Source: https://en.wikipedia.org/wiki/Centroid#Of_a_polygon
-
-def polygon_centroid (polygon):
-
-	if polygon[0] == polygon[-1]:
-
-		x = 0
-		y = 0
-		det = 0
-
-		for i in range(len(polygon) - 1):
-			d = polygon[i][0] * polygon[i+1][1] - polygon[i+1][0] * polygon[i][1]
-			det += d
-			x += (polygon[i][0] + polygon[i+1][0]) * d  # (x1 + x2) (x1*y2 - x2*y1)
-			y += (polygon[i][1] + polygon[i+1][1]) * d  # (y1 + y2) (x1*y2 - x2*y1)
-
-		return (x / (3.0 * det), y / (3.0 * det) )
-
-	else:
-		return None
-
-
-
 # Calculate center of polygon, or of list of nodes
 
 def polygon_center (polygon):
@@ -172,6 +148,7 @@ def bearing_turn (point1, point2, point3):
 	return bearing_difference(bearing1, bearing2)
 
 
+
 # Rotate point with specified angle around axis point.
 # https://gis.stackexchange.com/questions/246258/transforming-data-from-a-rotated-pole-lat-lon-grid-into-regular-lat-lon-coordina
 
@@ -199,13 +176,20 @@ def parse_polygon(coord_text):
 
 	split_coord = coord_text.split(" ")
 	coordinates = []
-	last_node = (None, None)
+	last_node1 = (None, None)
+	last_node2 = (None, None)
 	for i in range(0, len(split_coord) - 1, 2):
 		lon = float(split_coord[i])
 		lat = float(split_coord[i+1])
-		if (lon, lat) != last_node:
-			coordinates.append((lon, lat))
-		last_node = (lon, lat)
+		node = (lon, lat)
+		if node != last_node1:
+			if node == last_node2:
+				coordinates.pop()
+				last_node1 = last_node2
+			else:
+				coordinates.append(node)
+		last_node2 = last_node1
+		last_node1 = node
 
 	return coordinates
 
@@ -339,7 +323,8 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
 			message ("%s*** Too many buildings in box, force split box and reloading" % ("\t" * level))
 		count_load += load_area(municipality_id, min_bbox, max_bbox, level, force_divide=True)
 	elif not verbose:
-		message ("\r%i " % sum((building['geometry']['type'] == "Polygon") for building in buildings.values()))
+		countdown = len(buildings) - sum((building['geometry']['type'] == "Polygon") for building in buildings.values())
+		message ("\r\tLoading ... %6i " % countdown)
 		
 	return count_load
 
@@ -401,8 +386,7 @@ def load_area(municipality_id, min_bbox, max_bbox, level, force_divide):
 def load_coordinates_municipality(municipality_id):
 
 	message ("Load building polygons ...\n")
-	message ("\tExpecting approx. %i buildings\n" % len(buildings))
-#	message ("\tLoading ... ")
+	message ("\tLoading ... %6i " % len(buildings))
 
 	file = urllib.request.urlopen("https://ws.geonorge.no/kommuneinfo/v1/kommuner/" + municipality_id)
 	data = json.load(file)
@@ -412,9 +396,7 @@ def load_coordinates_municipality(municipality_id):
 	count_load = load_area(municipality_id, bbox[0], bbox[2], 1, force_divide=False)  # Start with full bbox
 
 	count_polygons = sum((building['geometry']['type'] == "Polygon") for building in buildings.values())
-
-	message ("\r      \r")
-	message ("\tLoaded %i building polygons with %i load queries\n" % (count_polygons, count_load))
+	message ("\r\tLoaded %i building polygons with %i load queries\n" % (count_polygons, count_load))
 
 
 
@@ -683,8 +665,7 @@ def update_corner(corners, wall, node, used):
 	if wall:
 		wall['nodes'].append(node)
 		corners[node]['used'] += used
-		if wall not in corners[node]['walls']:
-			corners[node]['walls'].append(wall)
+		corners[node]['walls'].append(wall)
 
 
 
@@ -746,7 +727,7 @@ def rectify_polygons():
 		if building_test['geometry']['type'] != "Polygon" or "rectified" in building_test:
 			continue
 
-		# 1. First identify buildings which are connected and must be rectifed as agroup
+		# 1. First identify buildings which are connected and must be rectifed as a group
 
 		building_group = []
 		check_neighbours = building_test['neighbours']  # includes self
@@ -778,7 +759,7 @@ def rectify_polygons():
 
 				if len(polygon) < 5 or polygon[0] != polygon[-1]:
 					conform = False
-					building['properties']['DEBUG_NORECTIFY'] = "No, only %u walls" % len(polygon)
+					building['properties']['DEBUG_NORECTIFY'] = "No, only %i walls" % len(polygon)
 					break
 
 				# Build list of polygon with only square corners
@@ -850,7 +831,8 @@ def rectify_polygons():
 					# Wrap from end to start
 					patch_walls[0]['nodes'] = wall['nodes'] + patch_walls[0]['nodes']
 					for node in wall['nodes']:
-						corners[node]['walls'].remove(wall)
+						wall_index = len(corners[node]['walls']) - corners[node]['walls'][::-1].index(wall) - 1  # Find last occurence
+						corners[node]['walls'].pop(wall_index)  # remove(wall)
 						if patch_walls[0] not in corners[node]['walls']:
 							corners[node]['walls'].append(patch_walls[0])
 
@@ -882,7 +864,7 @@ def rectify_polygons():
 		bearings = []
 		group_bearing = 90.0  # For first patch in group, corresponding to axis 1
 		group_axis = 1
-		diff_info = []
+#		diff_info = []
 
 		for patch in walls:
 			start_axis = None
@@ -902,7 +884,7 @@ def rectify_polygons():
 					else:
 						start_axis = 1 - group_axis  # Axis 0 (x axis)
 
-					diff_info.append("%i %i %i %i %i" % (group_bearing, wall_bearing, diff, group_axis, start_axis))
+#					diff_info.append("%i %i %i %i %i" % (group_bearing, wall_bearing, diff, group_axis, start_axis))
 
 					if not bearings:
 						group_axis = start_axis
@@ -938,6 +920,7 @@ def rectify_polygons():
 		# 5. Combine connected walls with same axis
 		# After this section, the wall list in corners is no longer accurate
 
+		copy_walls = copy.deepcopy(walls)
 		walls = [wall for patch in walls for wall in patch]  # Flatten walls
 
 		combine_walls = []  # List will contain all combinations of walls in group which can be combined
