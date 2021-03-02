@@ -22,28 +22,29 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.2.1"
+version = "0.3.0"
 
-verbose = False				# Provides extra messages about polygon loading
+verbose = False					# Provides extra messages about polygon loading
 
-debug = False				# Add debugging / testing information
-verify = False				# Add tags for users to verify
-original = False			# Output polygons as in original data (no rectification/simplification)
+debug = False					# Add debugging / testing information
+verify = False					# Add tags for users to verify
+original = False				# Output polygons as in original data (no rectification/simplification)
 
-coordinate_decimals = 7
+coordinate_decimals = 7			# Number of decimals in output
 
-angle_margin = 8.0			# Max margin around angle limits, for example around 90 degrees corners (degrees)
-short_margin = 0.20			# Min length of short wall which will be removed if on "straight" line (meters)
-corner_margin = 1.0			# Max length of short wall which will be rectified even if corner is outside of 90 +/- angle_margin (meters)
-rectify_margin = 0.2		# Max relocation distance for nodes during rectification before producing information tag (meters)
+angle_margin = 8.0				# Max margin around angle limits, for example around 90 degrees corners (degrees)
+short_margin = 0.20				# Min length of short wall which will be removed if on "straight" line (meters)
+corner_margin = 1.0				# Max length of short wall which will be rectified even if corner is outside of 90 +/- angle_margin (meters)
+rectify_margin = 0.2			# Max relocation distance for nodes during rectification before producing information tag (meters)
 
-simplify_margin = 8.0		# Max angle for simplification, i.e. remove node (degrees)
+simplify_margin_line = 0.20		# Minimum tolerance for buildings without curves in simplification (meters)
+simplify_margin_curve = 0.05	# Minimum tolerance for buildings with curves in simplification (meters)
 
-curve_margin_max = 40		# Max angle for a curve (degrees)
-curve_margin_min = 0.3		# Min agnle for a curve (degrees)
-curve_margin_nodes = 3		# At least three nodes in a curve (number of nodes)
+curve_margin_max = 40			# Max angle for a curve (degrees)
+curve_margin_min = 0.3			# Min agnle for a curve (degrees)
+curve_margin_nodes = 3			# At least three nodes in a curve (number of nodes)
 
-max_download = 10000		# Max features permitted for downloading by WFS per query
+max_download = 10000			# Max features permitted for downloading by WFS per query
 
 
 status_codes = {
@@ -90,6 +91,33 @@ def distance (point1, point2):
 	x = (lon2 - lon1) * math.cos( 0.5*(lat2+lat1) )
 	y = lat2 - lat1
 	return 6371000.0 * math.sqrt( x*x + y*y )  # Metres
+
+
+
+# Calculate coordinate area of polygon in square meters
+# Simple conversion to planar projection, works for small areas
+# < 0: Clockwise
+# > 0: Counter-clockwise
+# = 0: Polygon not closed
+
+def polygon_area (polygon):
+
+	if polygon[0] == polygon[-1]:
+		lat_dist = math.pi * 6371000.0 / 180.0
+
+		coord = []
+		for node in polygon:
+			y = node[1] * lat_dist
+			x = node[0] * lat_dist * math.cos(math.radians(node[1]))
+			coord.append((x,y))
+
+		area = 0.0
+		for i in range(len(coord) - 1):
+			area += (coord[i+1][0] - coord[i][0]) * (coord[i+1][1] + coord[i][1])  # (x2-x1)(y2+y1)
+
+		return int(area / 2.0)
+	else:
+		return 0
 
 
 
@@ -166,6 +194,81 @@ def rotate_node (axis, r_angle, point):
 	ynew = yrot + axis[1]
 
 	return (xnew, ynew)
+
+
+
+# Compute closest distance from point p3 to line segment [s1, s2].
+# Works for short distances.
+
+def line_distance(s1, s2, p3):
+
+	x1, y1, x2, y2, x3, y3 = map(math.radians, [s1[0], s1[1], s2[0], s2[1], p3[0], p3[1]])
+
+	# Simplified reprojection of latitude
+	x1 = x1 * math.cos( y1 )
+	x2 = x2 * math.cos( y2 )
+	x3 = x3 * math.cos( y3 )
+
+	A = x3 - x1
+	B = y3 - y1
+	dx = x2 - x1
+	dy = y2 - y1
+
+	dot = (x3 - x1)*dx + (y3 - y1)*dy
+	len_sq = dx*dx + dy*dy
+
+	if len_sq != 0:  # in case of zero length line
+		param = dot / len_sq
+	else:
+		param = -1
+
+	if param < 0:
+		x4 = x1
+		y4 = y1
+	elif param > 1:
+		x4 = x2
+		y4 = y2
+	else:
+		x4 = x1 + param * dx
+		y4 = y1 + param * dy
+
+	# Also compute distance from p to segment
+
+	x = x4 - x3
+	y = y4 - y3
+	distance = 6371000 * math.sqrt( x*x + y*y )  # In meters
+
+	# Project back to longitude/latitude
+
+	x4 = x4 / math.cos(y4)
+
+	lon = math.degrees(x4)
+	lat = math.degrees(y4)
+
+	return (lon, lat, distance)
+
+
+
+# Simplify polygon, i.e. reduce nodes within epsilon distance.
+# Ramer-Douglas-Peucker method: https://en.wikipedia.org/wiki/Ramer–Douglas–Peucker_algorithm
+
+def simplify_polygon(polygon, epsilon):
+
+	dmax = 0.0
+	index = 0
+	for i in range(1, len(polygon) - 1):
+#		if nodes[ polygon[i] ]['used'] == 1:
+		lon, lat, d = line_distance(polygon[0], polygon[-1], polygon[i])
+		if d > dmax:
+			index = i
+			dmax = d
+
+	if dmax >= epsilon:
+		new_polygon = simplify_polygon(polygon[:index+1], epsilon)[:-1] + simplify_polygon(polygon[index:], epsilon)
+	else:
+		new_polygon = [polygon[0], polygon[-1]]
+
+	return new_polygon
 
 
 
@@ -395,6 +498,13 @@ def load_coordinates_municipality(municipality_id):
 
 	count_load = load_area(municipality_id, bbox[0], bbox[2], 1, force_divide=False)  # Start with full bbox
 
+	# Adjust garage tagging according to size
+	for building in buildings.values():
+		if building['geometry']['type'] == "Polygon" and "building" in building['properties'] and \
+				building['properties']['building'] == "garage" and \
+				abs(polygon_area(building['geometry']['coordinates'][0])) > 100:
+			building['properties']['building'] = "garages"
+
 	count_polygons = sum((building['geometry']['type'] == "Polygon") for building in buildings.values())
 	message ("\r\tLoaded %i building polygons with %i load queries\n" % (count_polygons, count_load))
 
@@ -484,7 +594,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 			"type": "Feature",
 			"geometry": {
 				"type": "Point",
-					"coordinates": centroid
+				"coordinates": centroid
 			},
 			"properties": {
 				'ref:bygningsnr': ref,
@@ -542,12 +652,12 @@ def load_neighbour_buildings(municipality_id):
 
 
 # Simplify polygon
-# Remove non-essential nodes, i.e. nodes on (almost) staight lines
+# Remove redundant nodes, i.e. nodes on (almost) staight lines
 
-def simplify_polygons():
+def simplify_buildings():
 
 	message ("Simplify polygons ...\n")
-	message ("\tSimplification factor: %i degrees\n" % simplify_margin)
+	message ("\tSimplification factor: %.2f m (curve), %.2f m (line)\n" % (simplify_margin_curve, simplify_margin_line))
 
 	# Make dict of all nodes with count of usage
 
@@ -565,7 +675,7 @@ def simplify_polygons():
 
 	message ("\t%i nodes used by more than one building\n" % count)
 
-	# Identify non-essential nodes, i.e. nodes on a straight line
+	# Identify redundant nodes, i.e. nodes on an (almost) straight line
 
 	count = 0
 	for ref, building in iter(buildings.items()):
@@ -573,7 +683,7 @@ def simplify_polygons():
 
 			for polygon in building['geometry']['coordinates']:
 
-				# First discover curved walls
+				# First discover curved walls, to keep more detail
 
 				curves = set()
 				curve = set()
@@ -599,28 +709,23 @@ def simplify_polygons():
 					building['properties']['VERIFY_CURVE'] = str(len(curves))
 					count += 1
 
-				# Then identify non-essential nodes which are not part of curved walls.
-				# Short segments may be removed with larger margins.
+				# Then simplify polygon
 
-				last_node = polygon[-2]
-				for i in range(len(polygon) - 1):
-					angle = bearing_turn(last_node, polygon[i], polygon[i+1])
-					length = distance(polygon[i], polygon[i+1])
+				if curves:
+					new_polygon = simplify_polygon(polygon, simplify_margin_curve)
+				else:
+					new_polygon = simplify_polygon(polygon, simplify_margin_line)
 
-					if i not in curves and \
-							(abs(angle) < simplify_margin or \
-							length < short_margin and \
-								(abs(angle) < 40 or \
-								abs(angle + bearing_turn(polygon[i], polygon[i+1], polygon[(i+2) % (len(polygon)-1)])) < simplify_margin) or \
-							length < corner_margin and abs(angle) < 2 * simplify_margin):
+				if len(new_polygon) < len(polygon):
+					building['properties']['VERIFY_SIMPLIFY'] = str(len(polygon) - len(new_polygon))
+					for node in polygon:
+						if node not in new_polygon:
+							nodes[ node ] -= 1
 
-						nodes[ polygon[i] ] -= 1
-						if angle > simplify_margin - 2:
-							building['properties']['VERIFY_SIMPLIFY'] = "%.1f" % abs(angle)
-					else:
-						last_node = polygon[i]
+					polygon = new_polygon
 
-	message ("\tIdentified %i buildings with curved walls\n" % count)
+	if debug or verify:
+		message ("\tIdentified %i buildings with curved walls\n" % count)
 
 	# Create set of nodes which may be deleted without conflicts
 
@@ -675,7 +780,7 @@ def update_corner(corners, wall, node, used):
 # The only input data required is the building dict, where each member is a standard geojson feature member.
 # Supports single polygons, multipolygons (outer/inner) and group of connected buildings.
 
-def rectify_polygons():
+def rectify_buildings():
 
 	message ("Rectify building polygons ...\n")
 	message ("\tTreshold for square corners: 90 +/- %i degrees\n" % angle_margin)
@@ -920,7 +1025,6 @@ def rectify_polygons():
 		# 5. Combine connected walls with same axis
 		# After this section, the wall list in corners is no longer accurate
 
-		copy_walls = copy.deepcopy(walls)
 		walls = [wall for patch in walls for wall in patch]  # Flatten walls
 
 		combine_walls = []  # List will contain all combinations of walls in group which can be combined
@@ -1143,8 +1247,8 @@ if __name__ == '__main__':
 	load_coordinates_municipality(municipality_id)
 
 	if not original:
-		rectify_polygons()
-		simplify_polygons()
+		rectify_buildings()
+		simplify_buildings()
 
 	save_file()
 
