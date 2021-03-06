@@ -22,29 +22,30 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.3.0"
+version = "0.4.0"
 
-verbose = False					# Provides extra messages about polygon loading
+verbose = False				# Provides extra messages about polygon loading
 
-debug = False					# Add debugging / testing information
-verify = False					# Add tags for users to verify
-original = False				# Output polygons as in original data (no rectification/simplification)
+debug = False				# Add debugging / testing information
+verify = False				# Add tags for users to verify
+original = False			# Output polygons as in original data (no rectification/simplification)
 
-coordinate_decimals = 7			# Number of decimals in output
+coordinate_decimals = 7		# Number of decimals in output
 
-angle_margin = 8.0				# Max margin around angle limits, for example around 90 degrees corners (degrees)
-short_margin = 0.20				# Min length of short wall which will be removed if on "straight" line (meters)
-corner_margin = 1.0				# Max length of short wall which will be rectified even if corner is outside of 90 +/- angle_margin (meters)
-rectify_margin = 0.2			# Max relocation distance for nodes during rectification before producing information tag (meters)
+angle_margin = 8.0			# Max margin around angle limits, for example around 90 degrees corners (degrees)
+short_margin = 0.20			# Min length of short wall which will be removed if on "straight" line (meters)
+corner_margin = 1.0			# Max length of short wall which will be rectified even if corner is outside of 90 +/- angle_margin (meters)
+rectify_margin = 0.2		# Max relocation distance for nodes during rectification before producing information tag (meters)
 
-simplify_margin_line = 0.20		# Minimum tolerance for buildings without curves in simplification (meters)
-simplify_margin_curve = 0.05	# Minimum tolerance for buildings with curves in simplification (meters)
+simplify_margin = 0.05		# Minimum tolerance for buildings with curves in simplification (meters)
 
-curve_margin_max = 40			# Max angle for a curve (degrees)
-curve_margin_min = 0.3			# Min agnle for a curve (degrees)
-curve_margin_nodes = 3			# At least three nodes in a curve (number of nodes)
+curve_margin_max = 40		# Max angle for a curve (degrees)
+curve_margin_min = 0.3		# Min agnle for a curve (degrees)
+curve_margin_nodes = 3		# At least three nodes in a curve (number of nodes)
 
-max_download = 10000			# Max features permitted for downloading by WFS per query
+addr_margin = 100			# Max margin for matching address point with building centre, for building levels info (meters)
+
+max_download = 10000		# Max features permitted for downloading by WFS per query
 
 
 status_codes = {
@@ -67,6 +68,19 @@ def message (text):
 
 	sys.stderr.write(text)
 	sys.stderr.flush()
+
+
+
+# Format time
+
+def timeformat (sec):
+
+	if sec > 3600:
+		return "%i:%02i:%02i hours" % (sec / 3600, (sec % 3600) / 60, sec % 60)
+	elif sec > 60:
+		return "%i:%02i minutes" % (sec / 60, sec % 60)
+	else:
+		return "%i seconds" % sec
 
 
 
@@ -121,9 +135,9 @@ def polygon_area (polygon):
 
 
 
-# Calculate center of polygon, or of list of nodes
+# Calculate centre of polygon, or of list of nodes
 
-def polygon_center (polygon):
+def polygon_centre (polygon):
 
 	length = len(polygon)
 	if polygon[0] == polygon[-1]:
@@ -135,6 +149,35 @@ def polygon_center (polygon):
 		x += node[0]
 		y += node[1]
 	return (x / length, y / length)
+
+
+
+# Tests whether point (x,y) is inside a polygon
+# Ray tracing method
+
+def inside_polygon (point, polygon):
+
+	if polygon[0] == polygon[-1]:
+		x, y = point
+		n = len(polygon)
+		inside = False
+
+		p1x, p1y = polygon[0]
+		for i in range(n):
+			p2x, p2y = polygon[i]
+			if y > min(p1y, p2y):
+				if y <= max(p1y, p2y):
+					if x <= max(p1x, p2x):
+						if p1y != p2y:
+							xints = (y-p1y) * (p2x-p1x) / (p2y-p1y) + p1x
+						if p1x == p2x or x <= xints:
+							inside = not inside
+			p1x, p1y = p2x, p2y
+
+		return inside
+
+	else:
+		return None
 
 
 
@@ -257,7 +300,6 @@ def simplify_polygon(polygon, epsilon):
 	dmax = 0.0
 	index = 0
 	for i in range(1, len(polygon) - 1):
-#		if nodes[ polygon[i] ]['used'] == 1:
 		lon, lat, d = line_distance(polygon[0], polygon[-1], polygon[i])
 		if d > dmax:
 			index = i
@@ -295,6 +337,14 @@ def parse_polygon(coord_text):
 		last_node1 = node
 
 	return coordinates
+
+
+
+# Transform url characters
+
+def fix_url (url):
+
+	return url.replace("Æ","E").replace("Ø","O").replace("Å","A").replace("æ","e").replace("ø","o").replace("å","a").replace(" ", "_")
 
 
 
@@ -412,6 +462,7 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
 			if ref in buildings and coordinates:
 				buildings[ref]['geometry']['type'] = "Polygon"
 				buildings[ref]['geometry']['coordinates'] = coordinates
+#				buildings[ref]['centre'] = polygon_centre(coordinates[0])
 
 	file_in.close()
 
@@ -441,8 +492,8 @@ def load_area(municipality_id, min_bbox, max_bbox, level, force_divide):
 	count_load = 0
 	inside_box = 0
 	for building in buildings.values():
-		if min_bbox[0] <= building['centroid'][0] <  max_bbox[0] and \
-			min_bbox[1] <= building['centroid'][1] <  max_bbox[1]:
+		if min_bbox[0] <= building['centre'][0] <  max_bbox[0] and \
+			min_bbox[1] <= building['centre'][1] <  max_bbox[1]:
 			inside_box += 1
 
 	# How many buildings from neighbour municipalities within bbox?
@@ -532,7 +583,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 
 	url = "https://nedlasting.geonorge.no/geonorge/Basisdata/MatrikkelenBygning/GML/Basisdata_%s_%s_25833_MatrikkelenBygning_GML.zip" \
 			% (municipality_id, municipality_name)
-	url = url.replace("Æ","E").replace("Ø","O").replace("Å","A").replace("æ","e").replace("ø","o").replace("å","a").replace(" ", "_")
+	url = fix_url(url)
 
 	if not neighbour:
 		message ("Loading building information from cadastral registry ...\n")
@@ -569,10 +620,10 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 		position_split = position.split()
 		x, y = float(position_split[0]), float(position_split[1])
 		[lat, lon] = utm.UtmToLatLon (x, y, 33, "N")  # Reproject from UTM to WGS84
-		centroid = ( round(lon, coordinate_decimals), round(lat, coordinate_decimals) )
+		centre = ( round(lon, coordinate_decimals), round(lat, coordinate_decimals) )
 
 		if neighbour:
-			neighbour_buildings.append(centroid)  # We only need center coordinates for neighbour municipalities
+			neighbour_buildings.append(centre)  # We only need centre coordinates for neighbour municipalities
 			continue
 
 		building_type = building.find("app:bygningstype", ns).text
@@ -594,7 +645,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 			"type": "Feature",
 			"geometry": {
 				"type": "Point",
-				"coordinates": centroid
+				"coordinates": centre
 			},
 			"properties": {
 				'ref:bygningsnr': ref,
@@ -602,7 +653,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 				'STATUS': "#%s %s" % (building_status, status_codes[ building_status ]),
 				'DATE': source_date[:10]
 			},
-			'centroid': centroid
+			'centre': centre
 		}
 
 		if building_type in building_types:
@@ -619,7 +670,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 			feature['properties']['SEFRAK'] = sefrak
 
 		if debug:
-			feature['properties']['DEBUG_CENTROID'] = str(centroid[1]) + " " + str(centroid[0])
+			feature['properties']['DEBUG_CENTRE'] = str(centre[1]) + " " + str(centre[0])
 
 		buildings[ ref ] = feature
 
@@ -631,7 +682,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 	return count
 
 
-# Load center coordinate for all buildings in neighbour municipalities, to make bbox splitting more accurate when loading building polygons.
+# Load centre coordinate for all buildings in neighbour municipalities, to make bbox splitting more accurate when loading building polygons.
 
 def load_neighbour_buildings(municipality_id):
 
@@ -651,13 +702,117 @@ def load_neighbour_buildings(municipality_id):
 
 
 
+# Identify the closest building (if any) and add levels tag
+
+def assign_levels_to_building(main_levels, roof_levels, point):
+
+	# Calculate bbox for search
+
+	min_lat = point[1] - addr_margin / 111500.0
+	max_lat = point[1] + addr_margin / 111500.0
+	min_lon = point[0] - addr_margin / (math.cos(math.radians(min_lat)) * 111320.0)
+	max_lon = point[0] + addr_margin / (math.cos(math.radians(max_lat)) * 111320.0)
+
+	# Loop buildings to identify closest building
+
+	best_distance = 99999.9  # Dummy
+	best_ref = None
+	for ref, building in iter(buildings.items()):
+		if min_lon < building['centre'][0] < max_lon and min_lat < building['centre'][1] < max_lat:
+			dist = distance(point, building['centre'])
+			if dist < best_distance and \
+					building['properties']['building'] in ['apartments', 'residential', 'dormitory', 'terrace', 'semidetached_house', \
+															'civic', 'commercial', 'retail', 'office', 'house', 'farm', 'cabin'] and \
+					building['geometry']['type'] == "Polygon" and inside_polygon(point, building['geometry']['coordinates'][0]):
+				best_ref = ref
+				best_distance = dist
+
+	# If found, add levels tags
+
+	if best_ref:
+		building = buildings[best_ref]
+		if "building:levels" in building['properties'] and main_levels != int(building['properties']['building:levels']):
+			building['properties']['building:levels'] = str(max(main_levels, int(building['properties']['building:levels'])))
+			building['properties']['DEBUG_LEVELS'] = building['properties']['building:levels']
+		else:	
+			building['properties']['building:levels'] = str(main_levels)
+
+		if roof_levels > 0:
+			if "roof:levels" in building['properties']:
+				building['properties']['roof:levels'] = str(max(roof_levels, int(building['properties']['roof:levels'])))
+			else:
+				building['properties']['roof:levels'] = str(roof_levels)
+
+
+# Load building level information from cadastral registry.
+# Only for apartments.
+
+def load_building_levels(municipality_id, municipality_name):
+
+	# Load file from GeoNorge
+
+	url = "https://nedlasting.geonorge.no/geonorge/Basisdata/MatrikkelenAdresseLeilighetsniva/CSV/Basisdata_%s_%s_4258_MatrikkelenAdresseLeilighetsniva_CSV.zip" \
+			% (municipality_id, municipality_name)
+	url = fix_url(url)
+
+	message ("Loading building level information from cadastral registry ...\n")
+#	message ("\tUrl: %s\n" % url)
+
+	in_file = urllib.request.urlopen(url)
+	zip_file = zipfile.ZipFile(BytesIO(in_file.read()))
+
+	if len(zip_file.namelist()) < 2:
+		message ("\n\t*** No apartment data available (you may try again later)\n\n")
+		return
+
+	csv_file = zip_file.open(zip_file.namelist()[1])
+	addr_table = csv.DictReader(TextIOWrapper(csv_file, "utf-8"), delimiter=";")
+
+	address = None
+	count = 0
+
+	for row in addr_table:
+
+		if row['adresseId'] != address:
+
+			# Assign levels to building and get ready for next building
+			if address:
+				if levels['H'] + levels['U'] > 1:
+					assign_levels_to_building(levels['H'] + levels['U'], levels['L'], point)
+					count += 1
+					message ("\r%i " % count)
+
+			address = row['adresseId']
+			point = (float(row['Øst']), float(row['Nord']))
+			levels = {
+				'H': 0,  # Main levels, all above ground
+				'U': 0,  # Main levels, above ground on at least one side
+				'K': 0,  # Underground levels
+				'L': 0   # Roof levels
+			}
+
+		# Count levels if available
+
+		level = row['bruksenhetsnummerTekst'][:3]
+		if level:
+			levels[ level[0] ] = max(levels[ level[0] ], int(level[1:]))
+
+	message ("\r       \r")
+	message ("\tFound %i buildings with level information (>1 levels)\n" % count)
+
+	csv_file.close()
+	zip_file.close()
+	in_file.close()
+
+
+
 # Simplify polygon
 # Remove redundant nodes, i.e. nodes on (almost) staight lines
 
 def simplify_buildings():
 
 	message ("Simplify polygons ...\n")
-	message ("\tSimplification factor: %.2f m (curve), %.2f m (line)\n" % (simplify_margin_curve, simplify_margin_line))
+	message ("\tSimplification factor: %.2f m (curve), %i degrees (line)\n" % (simplify_margin, angle_margin))
 
 	# Make dict of all nodes with count of usage
 
@@ -712,17 +867,34 @@ def simplify_buildings():
 				# Then simplify polygon
 
 				if curves:
-					new_polygon = simplify_polygon(polygon, simplify_margin_curve)
+					# Light simplification for curved buildings
+
+					new_polygon = simplify_polygon(polygon, simplify_margin)
+
+					if len(new_polygon) < len(polygon):
+						building['properties']['VERIFY_SIMPLIFY_CURVE'] = str(len(polygon) - len(new_polygon))
+						for node in polygon:
+							if node not in new_polygon:
+								nodes[ node ] -= 1
 				else:
-					new_polygon = simplify_polygon(polygon, simplify_margin_line)
+					# Simplification for buildings without curves
 
-				if len(new_polygon) < len(polygon):
-					building['properties']['VERIFY_SIMPLIFY'] = str(len(polygon) - len(new_polygon))
-					for node in polygon:
-						if node not in new_polygon:
-							nodes[ node ] -= 1
+					last_node = polygon[-2]
+					for i in range(len(polygon) - 1):
+						angle = bearing_turn(last_node, polygon[i], polygon[i+1])
+						length = distance(polygon[i], polygon[i+1])
 
-					polygon = new_polygon
+						if (abs(angle) < angle_margin or \
+							length < short_margin and \
+								(abs(angle) < 40 or \
+								abs(angle + bearing_turn(polygon[i], polygon[i+1], polygon[(i+2) % (len(polygon)-1)])) < angle_margin) or \
+							length < corner_margin and abs(angle) < 2 * angle_margin):
+
+							nodes[ polygon[i] ] -= 1
+							if angle > angle_margin - 2:
+								building['properties']['VERIFY_SIMPLIFY_LINE'] = "%.1f" % abs(angle)
+						else:
+							last_node = polygon[i]
 
 	if debug or verify:
 		message ("\tIdentified %i buildings with curved walls\n" % count)
@@ -969,7 +1141,6 @@ def rectify_buildings():
 		bearings = []
 		group_bearing = 90.0  # For first patch in group, corresponding to axis 1
 		group_axis = 1
-#		diff_info = []
 
 		for patch in walls:
 			start_axis = None
@@ -989,8 +1160,6 @@ def rectify_buildings():
 					else:
 						start_axis = 1 - group_axis  # Axis 0 (x axis)
 
-#					diff_info.append("%i %i %i %i %i" % (group_bearing, wall_bearing, diff, group_axis, start_axis))
-
 					if not bearings:
 						group_axis = start_axis
 
@@ -1006,8 +1175,8 @@ def rectify_buildings():
 
 			group_bearing = statistics.median_low(bearings)
 
-		# Compute center for rotation, average of all corner nodes in cluster of buildings
-		axis = polygon_center(list(corners.keys()))
+		# Compute centre for rotation, average of all corner nodes in cluster of buildings
+		axis = polygon_centre(list(corners.keys()))
 
 		# Compute median bearing, by which buildings will be rotatatet
 
@@ -1245,6 +1414,7 @@ if __name__ == '__main__':
 	load_building_info(municipality_id, municipalities[municipality_id], neighbour=False)
 	load_neighbour_buildings(municipality_id)
 	load_coordinates_municipality(municipality_id)
+	load_building_levels(municipality_id, municipalities[municipality_id])
 
 	if not original:
 		rectify_buildings()
@@ -1252,4 +1422,4 @@ if __name__ == '__main__':
 
 	save_file()
 
-	message("Done in %i seconds\n\n" % (time.time() - start_time))
+	message("Done in %s\n\n" % timeformat(time.time() - start_time))
