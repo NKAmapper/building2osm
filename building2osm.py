@@ -22,7 +22,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.4.0"
+version = "0.4.1"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -459,6 +459,8 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
 			coordinates.append( parse_polygon(geo) )
 
 		if "</wfs:member>" in line:
+			if ref == "12305729":
+				message ("URL: %s\n" % url)
 			if ref in buildings and coordinates:
 				buildings[ref]['geometry']['type'] = "Polygon"
 				buildings[ref]['geometry']['coordinates'] = coordinates
@@ -682,6 +684,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 	return count
 
 
+
 # Load centre coordinate for all buildings in neighbour municipalities, to make bbox splitting more accurate when loading building polygons.
 
 def load_neighbour_buildings(municipality_id):
@@ -715,21 +718,19 @@ def assign_levels_to_building(main_levels, roof_levels, point):
 
 	# Loop buildings to identify closest building
 
-	best_distance = 99999.9  # Dummy
-	best_ref = None
+	found_ref = None
 	for ref, building in iter(buildings.items()):
 		if min_lon < building['centre'][0] < max_lon and min_lat < building['centre'][1] < max_lat:
-			dist = distance(point, building['centre'])
-			if dist < best_distance and \
+			if building['geometry']['type'] == "Polygon" and \
 					building['properties']['building'] in ['apartments', 'residential', 'dormitory', 'terrace', 'semidetached_house', \
 															'civic', 'commercial', 'retail', 'office', 'house', 'farm', 'cabin'] and \
-					building['geometry']['type'] == "Polygon" and inside_polygon(point, building['geometry']['coordinates'][0]):
-				best_ref = ref
-				best_distance = dist
+					inside_polygon(point, building['geometry']['coordinates'][0]):
+				found_ref = ref
+				break
 
 	# If found, add levels tags
 
-	if best_ref:
+	if found_ref:
 		building = buildings[best_ref]
 		if "building:levels" in building['properties'] and main_levels != int(building['properties']['building:levels']):
 			building['properties']['building:levels'] = str(max(main_levels, int(building['properties']['building:levels'])))
@@ -742,6 +743,7 @@ def assign_levels_to_building(main_levels, roof_levels, point):
 				building['properties']['roof:levels'] = str(max(roof_levels, int(building['properties']['roof:levels'])))
 			else:
 				building['properties']['roof:levels'] = str(roof_levels)
+
 
 
 # Load building level information from cadastral registry.
@@ -780,7 +782,7 @@ def load_building_levels(municipality_id, municipality_name):
 				if levels['H'] + levels['U'] > 1:
 					assign_levels_to_building(levels['H'] + levels['U'], levels['L'], point)
 					count += 1
-					message ("\r%i " % count)
+					message ("\r\t%i " % count)
 
 			address = row['adresseId']
 			point = (float(row['Øst']), float(row['Nord']))
@@ -797,8 +799,7 @@ def load_building_levels(municipality_id, municipality_name):
 		if level:
 			levels[ level[0] ] = max(levels[ level[0] ], int(level[1:]))
 
-	message ("\r       \r")
-	message ("\tFound %i buildings with level information (>1 levels)\n" % count)
+	message ("\r\tFound %i buildings with level information (>1 levels)\n" % count)
 
 	csv_file.close()
 	zip_file.close()
@@ -999,7 +1000,7 @@ def rectify_buildings():
 	for ref, building_test in iter(buildings.items()):
 
 		count += 1
-		message ("\r%i " % count)
+		message ("\r\t%i " % count)
 
 		if building_test['geometry']['type'] != "Polygon" or "rectified" in building_test:
 			continue
@@ -1297,8 +1298,7 @@ def rectify_buildings():
 			for building in building_group:
 				building['rectified'] = "no"  # Do not test again
 
-	message ("\r      \r")
-	message ("\tRemoved %i redundant nodes in buildings\n" % count_remove)
+	message ("\r\tRemoved %i redundant nodes in buildings\n" % count_remove)
 	message ("\t%i buildings rectified\n" % count_rectify)
 	message ("\t%i buildings could not be rectified\n" % count_not_rectify)
 
@@ -1372,7 +1372,7 @@ def save_file():
 if __name__ == '__main__':
 
 	start_time = time.time()
-	message ("\n*** buildings2osm v%s\n\n" % version)
+	message ("\n*** buildings2osm v%s ***\n\n" % version)
 
 	municipalities = {}
 	building_types = {}
