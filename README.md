@@ -5,7 +5,7 @@ _Please note that the review of the import plan has not yet been completed, so p
 
 #### Usage
 
-<code>python3 building2osm.py [municipality] [-original] [-verify] [-debug]</code>
+<code>python3 building2osm.py \<municipality\> [-original] [-verify] [-debug]</code>
 
 Parameters:
 * _municipality_ - Name of the municipality to generate.
