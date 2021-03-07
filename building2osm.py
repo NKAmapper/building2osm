@@ -22,7 +22,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.4.2"
+version = "0.4.3"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -177,7 +177,7 @@ def inside_polygon (point, polygon):
 		return inside
 
 	else:
-		return None
+		return False
 
 
 
@@ -1282,7 +1282,7 @@ def rectify_buildings():
 							relocated = max(relocated, distance(node, corners[node]['new_node']))
  
 					if new_polygon[0] != new_polygon[-1]:  # First + last node were removed
-						polygon.append(polygon[0])
+						new_polygon.append(new_polygon[0])
 
 					building['geometry']['coordinates'][i] = new_polygon
 
