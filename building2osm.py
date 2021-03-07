@@ -22,7 +22,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.4.1"
+version = "0.4.2"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -731,7 +731,7 @@ def assign_levels_to_building(main_levels, roof_levels, point):
 	# If found, add levels tags
 
 	if found_ref:
-		building = buildings[best_ref]
+		building = buildings[found_ref]
 		if "building:levels" in building['properties'] and main_levels != int(building['properties']['building:levels']):
 			building['properties']['building:levels'] = str(max(main_levels, int(building['properties']['building:levels'])))
 			building['properties']['DEBUG_LEVELS'] = building['properties']['building:levels']
