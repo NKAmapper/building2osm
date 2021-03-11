@@ -27,10 +27,10 @@
 181;Garasje, uthus, anneks til bolig;building=garage;;Garasje, uthus , anneks knyttet til bolig.  Garasje: F rittliggende bygning som primært benyttes for parkering av bil. Kan i tillegg inneholde boder o.l.  Uthus: F rittliggende bygning som benyttes til oppbevaring av redskap, ved, materialer o.l.  Anneks : Frittliggende bygg beregnet for overnatting og er ingen selvstendig boenhet for varig opphold. Det skal ikke registreres bruksareal til bolig på slike bygg.
 182;Garasje, uthus, anneks til fritidsbolig;building=shed;;Garasje, uthus , anneks knyttet til fritidsbolig.  Garasje: F rittliggende bygning som primært benyttes for parkering av bil. Kan i tillegg inneholde boder o.l.  Uthus: F rittliggende bygning som benyttes til oppbevaring av redskap, ved, materialer o.l.  Anneks : Frittliggende bygg beregnet for overnatting og er ingen selvstendig boenhet for varig opphold. Det skal ikke registreres bruksareal til bolig på slike bygg.
 183;Naust, båthus, sjøbu;building=boathouse;;Naust , båthus, sjøbu  Frittliggende bygning som primært benyttes til plassering av båt(er). Kan i tillegg benyttes til oppbevaring av forskjellig redskap o.l.
-193;Boligbrakker;building=barracks;;Boligbrakke
+193;Boligbrakker;building=container;;Boligbrakke
 199;Annen boligbygning (sekundærbolig reindrift);building=yes;;Annen boligbygning/sekundærbolig (f.eks. sekundærbolig reindrift)   
 211;Fabrikkbygning;building=industrial;man_made=works;Bygning for industriell serieproduksjon.
-212;Verkstedbygning;building=commercial;man_made=works;Bygning for spesialproduksjon eller reparasjon
+212;Verkstedbygning;building=commercial;;Bygning for spesialproduksjon eller reparasjon
 214;Bygning for renseanlegg;building=service;man_made=wastewater_plant;Bygning for renseanlegg, bl.a. kloakkpumpestasjon 
 216;Bygning for vannforsyning;building=service;man_made=water_works;Bygning for vannforsyning, bl.a. pumpestasjon. 
 219;Annen industribygning;building=industrial;man_made=works;Annen industribygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er)
@@ -48,7 +48,7 @@
 248;Annen fiskeri- og fangstbygning;building=yes;;Annen fiskeri- og fangstbygning 
 249;Annen landbruksbygning;building=barn;;Annen landbruksbygning
 311;Kontor- og administrasjonsbygning , rådhus.;building=office;;Kontor- og administrasjonsbygning er en bygning for administrasjon, planlegging og annet tjenesteytende arbeid, både offentlig og privat.
-312;Bankbygning, posthus;building=retail;amenity=bank;Bankbygning, posthus 
+312;Bankbygning, posthus;building=retail;;Bankbygning, posthus 
 313;Mediabygning;building=office;;Hus for produksjon og distribusjon/kringkasting av medieprodukter (aviser, radio og TV)
 319;Annen kontorbygning;building=office;;Annen kontorbygning, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).
 321;Kjøpesenter, varehus;building=retail;shop=mall;En bygning som inneholder flere forskjellige butikker.
@@ -104,10 +104,10 @@
 669;Annet kulturhus;building=civic;amenity=community_centre;Andre multifunksjonshus for kultur og idrett, herunder ungdomsklubb, som ikke passer inn under ovennevnte kategorier , eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).
 671;Kirke , kapell;building=church;amenity=place_of_worship + religion=christian + building=church;Kristent gudshus
 672;Bedehus , menighetshus;building=chapel;amenity=place_of_worship + religion=christian + building=chapel;Kristent forsamlingshus
-673;Krematorium, gravkapell, bårehus;building=chapel;amenity=worship_of_god + religion=christianity + building=chapel;Krematorium : Bygning for likbrenning.  Gravkapell  og bårehus: Bygning for oppbevaring av døde mennesker inntil begravelse og kremasjon.
-674;Synage og moske;building=church;amenity=place_of_worship + religion=muslim + building=mosque;Synagoge :  Jødisk Gudshus Moské :  Muslimsk Gudshus
+673;Krematorium, gravkapell, bårehus;building=chapel;amenity=place_of_worship;Krematorium : Bygning for likbrenning.  Gravkapell  og bårehus: Bygning for oppbevaring av døde mennesker inntil begravelse og kremasjon.
+674;Synage og moske;building=church;amenity=place_of_worship;Synagoge :  Jødisk Gudshus Moské :  Muslimsk Gudshus
 675;Kloster;building=chapel;amenity=monastery;Bygning der menn eller kvinner har trukket seg tilbake for å virkeliggjøre det religiøse ideal, i et lukket samfunn, og etter en bestemt regel.
-679;Annen bygninger for religiøse aktiviteter;building=religious;amenity=place_of_worship + religion=christian + building=religious;Bygninger som ikke passer inn under ovennevnte kategorier, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er). 
+679;Annen bygninger for religiøse aktiviteter;building=religious;amenity=place_of_worship;Bygninger som ikke passer inn under ovennevnte kategorier, eller bygning som har nær tilknytning til/tjener slik(e) bygning(er). 
 719;Sykehus;building=hospital;amenity=hospital;Dette gjelder bygninger for lokalsykehus, sentralsykehus, regionsykehus og universitetssykehus.  Typen omfatter også spesialsykehus, f.eks. psykiatriske sykehus, rehabiliteringssykehus, reumatiske sykehus, kreftsykehus o.a.
 721;Sykehjem;building=civic;amenity=social_facility + social_facility=nursing_home;Sykehjem
 722;Bo- og behandlingssenter;building=civic;amenity=social_facility + social_facility=assisted_living;Institusjoner der man bor permanent og samtidig har tilgang til et behandlingstilbud.
@@ -124,7 +124,7 @@
 825;Tilfluktsrom / bunker;building=bunker;military=bunker;
 829;Annen beredskapsbygning;building=service;;Annen beredskapsbygning eller bygning som har nær tilknytning til/tjener slik(e) bygning(er).  
 830;Monument;building=civic;historic=monument;Dette gjelder konstruksjoner som er minnesmerker eller kunstverker. Må tilfredsstille krav til bygning. 
-840;Offentlig toalett;building=toilets;;Dette gjelder bygninger som per definisjon er klassifisert under hovedtype 8 (fengselsbygning, beredskapsbygning mv.), men som ikke naturlig hører inn under én av de ovennevnte bygningstypene.
+840;Offentlig toalett;building=toilets;amenity=toilets;Dette gjelder bygninger som per definisjon er klassifisert under hovedtype 8 (fengselsbygning, beredskapsbygning mv.), men som ikke naturlig hører inn under én av de ovennevnte bygningstypene.
 956;Turisthytter;building=hotel;tourism=alpine_hut;
-970;Sykehus med akuttmottak;building=hospital;amenity=hospital;
+970;Sykehus med akuttmottak;building=hospital;amenity=hospital + emergency=yes;
 999;Ukjent bygningstype;building=yes;;
