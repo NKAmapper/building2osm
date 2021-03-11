@@ -22,7 +22,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.4.3"
+version = "0.5.0"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -280,7 +280,7 @@ def line_distance(s1, s2, p3):
 	x = x4 - x3
 	y = y4 - y3
 	distance = 6371000 * math.sqrt( x*x + y*y )  # In meters
-
+	'''
 	# Project back to longitude/latitude
 
 	x4 = x4 / math.cos(y4)
@@ -289,6 +289,8 @@ def line_distance(s1, s2, p3):
 	lat = math.degrees(y4)
 
 	return (lon, lat, distance)
+	'''
+	return distance
 
 
 
@@ -300,7 +302,7 @@ def simplify_polygon(polygon, epsilon):
 	dmax = 0.0
 	index = 0
 	for i in range(1, len(polygon) - 1):
-		lon, lat, d = line_distance(polygon[0], polygon[-1], polygon[i])
+		d = line_distance(polygon[0], polygon[-1], polygon[i])
 		if d > dmax:
 			index = i
 			dmax = d
@@ -413,8 +415,12 @@ def load_municipalities():
 	data = json.load(file)
 	file.close()
 	for county in data:
+		if county['fylkesnavn'] == "Oslo":
+			county['fylkesnavn'] = "Oslo fylke"
+		municipalities[ county['fylkesnummer'] ] = county['fylkesnavn']
 		for municipality in county['kommuner']:
 			municipalities[ municipality['kommunenummer'] ] = municipality['kommunenavnNorsk']
+	municipalities['00'] = "Norge"
 
 
 
@@ -600,7 +606,8 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 			max_download = 0.5 * max_download  # Aim for less aggressive target since neighbour info will be incomplete
 			return 0
 		else:
-			sys.exit("\n\n*** Building information for %s not available, please try later\n\n" % municipality_name)
+			message("\n\n*** Building information for %s not available, please try later\n\n" % municipality_name)
+			return 0
 
 	filename = zip_file.namelist()[0]
 	file = zip_file.open(filename)
@@ -822,7 +829,7 @@ def simplify_buildings():
 	for ref, building in iter(buildings.items()):
 		if building['geometry']['type'] == "Polygon":
 			for polygon in building['geometry']['coordinates']:
-				for node in polygon[:-1]:
+				for node in polygon:
 					if node not in nodes:
 						nodes[ node ] = 1
 					else:
@@ -872,6 +879,11 @@ def simplify_buildings():
 
 					new_polygon = simplify_polygon(polygon, simplify_margin)
 
+					# Check if start node could be simplified
+					if line_distance(new_polygon[-2], new_polygon[1], new_polygon[0]) < simplify_margin:
+						new_polygon = new_polygon[1:-1] + [ new_polygon[1] ]
+#						building['properties']['VERIFY_SIMPLIFY_FIRST'] = "yes"
+
 					if len(new_polygon) < len(polygon):
 						building['properties']['VERIFY_SIMPLIFY_CURVE'] = str(len(polygon) - len(new_polygon))
 						for node in polygon:
@@ -896,7 +908,7 @@ def simplify_buildings():
 								building['properties']['VERIFY_SIMPLIFY_LINE'] = "%.1f" % abs(angle)
 						else:
 							last_node = polygon[i]
-
+					
 	if debug or verify:
 		message ("\tIdentified %i buildings with curved walls\n" % count)
 
@@ -1306,7 +1318,7 @@ def rectify_buildings():
 
 # Ouput geojson file
 
-def save_file():
+def save_file(municipality_id, municipality_name):
 
 	filename = "bygninger_" + municipality_id + "_" + municipalities[municipality_id].replace(" ", "_") + ".geojson"
 	if debug:
@@ -1367,6 +1379,33 @@ def save_file():
 	message ("\tSaved %i buildings\n" % count)
 
 
+
+def process_municipality(municipality_id, municipality_name):
+
+	num_start_time = time.time()
+	message ("Municipality: %s %s\n\n" % (municipality_id, municipality_name))
+
+	buildings.clear()
+	neighbour_buildings.clear()
+	remove_nodes.clear()
+
+	count = load_building_info(municipality_id, municipality_name, neighbour=False)
+
+	if count > 0:
+		load_neighbour_buildings(municipality_id)
+		load_coordinates_municipality(municipality_id)
+		load_building_levels(municipality_id, municipality_name)
+
+		if not original:
+			rectify_buildings()
+			simplify_buildings()
+
+		save_file(municipality_id, municipality_name)
+
+		message("Done in %s\n\n" % timeformat(time.time() - num_start_time))
+
+
+
 # Main program
 
 if __name__ == '__main__':
@@ -1379,7 +1418,6 @@ if __name__ == '__main__':
 	buildings = {}
 	neighbour_buildings = []
 	remove_nodes = set()
-
 
 	# Parse parameters
 
@@ -1401,25 +1439,21 @@ if __name__ == '__main__':
 	# Get selected municipality
 
 	load_municipalities()
+
 	municipality_query = sys.argv[1]
 	municipality_id = get_municipality(municipality_query)
 	if municipality_id is None or municipality_id not in municipalities:
-		sys.exit("Municipality '%s' not found\n" % municipality_query)
-	
-	message ("Municipality: %s %s\n\n" % (municipality_id, municipalities[ municipality_id ]))
+		sys.exit("Municipality '%s' not found, or ambiguous\n" % municipality_query)
 
 	# Process
 
 	load_building_types()
-	load_building_info(municipality_id, municipalities[municipality_id], neighbour=False)
-	load_neighbour_buildings(municipality_id)
-	load_coordinates_municipality(municipality_id)
-	load_building_levels(municipality_id, municipalities[municipality_id])
 
-	if not original:
-		rectify_buildings()
-		simplify_buildings()
-
-	save_file()
-
-	message("Done in %s\n\n" % timeformat(time.time() - start_time))
+	if len(municipality_id) == 2:  # County
+		message ("Generating building files for all municipalities in %s\n\n" % municipalities[municipality_id])
+		for mun_id in municipalities:
+			if len(mun_id) == 4 and mun_id[0:2] == municipality_id or municipality_id == "00":
+				process_municipality(mun_id, municipalities[ mun_id])
+		message("%s done in %s\n\n" % (municipalities[municipality_id], timeformat(time.time() - start_time)))
+	else:
+		process_municipality(municipality_id, municipalities[ municipality_id ])
