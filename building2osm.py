@@ -1374,7 +1374,7 @@ def save_file(municipality_id, municipality_name):
 
 	file_out = open(filename, "w")
 	json.dump(features, file_out, indent = 2)
-	file_out.close
+	file_out.close()
 
 	message ("\tSaved %i buildings\n" % count)
 
