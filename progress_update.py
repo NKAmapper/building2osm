@@ -20,7 +20,8 @@ version = "0.1.0"
 request_header = {"User-Agent": "osmno/buildings2osm"}
 
 sleep_time = 1000  # Number of buildings per 1 second sleep time before Overpass requests
-overpass_instance = "https://overpass.kumi.systems/api/interpreter"  # https://overpass.kumi.systems/api/interpreter
+# Faster alternative to https://overpass-api.de/api/interpreter
+overpass_instance = "https://overpass.kumi.systems/api/interpreter"
 
 
 # Output message to console
