@@ -18,7 +18,7 @@ import utm
 #from xml.etree import ElementTree
 
 
-version = "0.3.0"
+version = "0.3.1"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -33,7 +33,10 @@ margin_area = 0.5       # Max 50% difference of building areas
 remove_addr = True 		# Remove addr tags from buildings
 
 # No warnings when replacing these building tags with each other
-similar_buildings = ["house", "detached", "residential", "cabin", "farm", "semidetached_house", "terrace", "bungalow"]
+similar_buildings = {
+	'residential': ["house", "detached", "residential", "cabin", "farm", "semidetached_house", "terrace", "bungalow", "apartments"],
+	'commercial': ["retail", "commercial", "warehouse", "industrial", "office"]
+}
 
 debug = False 			# Output extra tags for debugging/testing
 
@@ -541,7 +544,10 @@ def add_building(building, osm_element):
 
 		if osm_element is not None and way_element['tags']['building'] != "yes" and \
 				way_element['tags']['building'] != building['properties']['building'] and \
-			 	not (way_element['tags']['building'] in similar_buildings and building['properties']['building'] in similar_buildings):
+			 	not (way_element['tags']['building'] in similar_buildings['residential'] and \
+			 		building['properties']['building'] in similar_buildings['residential']) and \
+			 	not (way_element['tags']['building'] in similar_buildings['commercial'] and \
+			 		building['properties']['building'] in similar_buildings['commercial']):
 
 			way_element['tags']['OSM_BUILDING'] = way_element['tags']['building']
 
@@ -561,10 +567,11 @@ def add_building(building, osm_element):
 
 	else:
 		relation_element = {
-			'type': "multipolygon",
+			'type': 'relation',
 			'members': [],
 			'tags': building['properties']
 		}
+		relation_element['tags']['type'] = "multipolygon"
 
 		role = "outer"
 
@@ -616,7 +623,7 @@ def merge_buildings():
 
 	message ("Merging buildings ...\n")
 	message ("\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n" % (margin_haus, margin_tagged))
-	message ("\tMaximum area difference:      %i %%\n" % (margin_area * 100))
+	message ("\tMaximum area difference: %i %%\n" % (margin_area * 100))
 
 	count = len(osm_buildings)
 	count_merge = 0
