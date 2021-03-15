@@ -1,8 +1,6 @@
 # building2osm
 Generates import files for OpenStreetMap with buliding footprints from Kartverket.
 
-_Please note that the review of the import plan has not yet been completed, so please do not import any buildings to OSM yet._
-
 #### Usage
 
 <code>python3 building2osm.py \<municipality\> [-original] [-verify] [-debug]</code>
