@@ -19,11 +19,12 @@ Parameters:
 Conflates the geojson import file with existing buildings in OSM and produces an OSM file for manual verification and uploading.
 
 Usage:
-<code>python3 building_merge.py \<municipality\> [\<max distance\>] [-debug]</code>
+<code>python3 building_merge.py \<municipality\> [\<max distance\>] [\<filename.geojson\>] [-debug]</code>
 
 Parameters:
-* _municipality_ - Name of the municipality to conflate. The import geojson file must be present in the default folder.
+* _municipality_ - Name of the municipality to conflate.
 * _max distance_ - Optional maximum Hausdorff distance between matched buildings. Default value is 10 metres (5 metres is the building is tagged).
+* _filename.geojson_ - Optional input file in geojson format. If not specified, the import file for the municipality will be loaded (it must be present in the default folder).
 * <code>-debug</code> - Include extra tags for debugging.
 
 ### Notes
