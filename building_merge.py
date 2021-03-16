@@ -3,9 +3,9 @@
 
 # building_merge.py
 # Conflates geojson building import file with existing buildings in OSM.
-# Usage: building_merge <municipality name>.
-# geojson file from building2osm must be present in default folder.
-# Creates OSM file (manual upload to OSM)
+# Usage: building_merge <municipality name> [max Hausdorff distance] [filename.geojson] [-debug].
+# geojson file from building2osm must be present in default folder. Other filename is optional parameter.
+# Creates OSM file (manual upload to OSM).
 
 import math
 import copy
@@ -18,7 +18,7 @@ import utm
 #from xml.etree import ElementTree
 
 
-version = "0.3.1"
+version = "0.4.0"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -808,7 +808,13 @@ if __name__ == '__main__':
 	
 	message ("Municipality: %s %s\n\n" % (municipality_id, municipalities[ municipality_id ]))
 
+	# Get filename
+
 	filename = "bygninger_%s_%s.geojson" % (municipality_id, municipalities[ municipality_id ])
+
+	for arg in sys.argv[2:]:
+		if ".geojson" in arg:
+			filename = arg
 
 	# Process
 
