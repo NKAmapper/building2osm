@@ -86,11 +86,14 @@ def load_progress_page():
 
 	content = storesoup.find(class_="mw-parser-output")
 	table = content.find("caption", text="Import progress table - Municipalities\n").find_parent("table")
-	table_rows = table.find("tbody").find_all("tr", recursive=False)
+	table_rows = table.find("tbody").find_all("tr", recursive=False)[2:]
 
-	for row in table_rows[2:]:
-		cols = row.find_all('td')
-		cols = [ele.text.strip() for ele in cols]
+	for row in table_rows:
+		cols = [
+			ele.text.strip() if not (link := ele.next).name == 'a'
+			else f'[[{link.attrs["title"]}|{link.text}]]'  # Link to userpage
+			for ele in row.find_all('td')
+		]
 
 		for i in (3, 4, 5):
 			if not cols[i]:
@@ -112,11 +115,14 @@ def load_progress_page():
 	municipality_ids = {municipality["name"]: municipality_id for municipality_id, municipality in municipalities.items()}
 
 	table = content.find("caption", text="Import progress table - Bydeler\n").find_parent("table")
-	table_rows = table.find("tbody").find_all("tr", recursive=False)
+	table_rows = table.find("tbody").find_all("tr", recursive=False)[1:]
 
-	for row in table_rows[1:]:
-		cols = row.find_all('td')
-		cols = [ele.text.strip() for ele in cols]
+	for row in table_rows:
+		cols = [
+			ele.text.strip() if not (link := ele.next).name == 'a'
+			else f'[[{link.attrs["title"]}|{link.text}]]'  # Link to userpage
+			for ele in row.find_all('td')
+		]
 
 		for i in (2, 3, 4):
 			if not cols[i]:
