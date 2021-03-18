@@ -15,7 +15,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.4.2"
+version = "0.4.3"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -297,14 +297,6 @@ def hausdorff_distance(p1, p2):
 			cmax = cmin
 
 	return cmax
-
-
-
-# Transform url characters
-
-def fix_url (url):
-
-	return url.replace("Æ","E").replace("Ø","O").replace("Å","A").replace("æ","e").replace("ø","o").replace("å","a").replace(" ", "_")
 
 
 
@@ -815,7 +807,7 @@ if __name__ == '__main__':
 
 	# Get filename
 
-	filename = "bygninger_%s_%s.geojson" % (municipality_id, fix_url(municipalities[ municipality_id ]))
+	filename = "bygninger_%s_%s.geojson" % (municipality_id, municipalities[ municipality_id ].replace(" ", "_"))
 
 	for arg in sys.argv[2:]:
 		if ".geojson" in arg:
