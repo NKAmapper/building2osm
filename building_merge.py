@@ -8,23 +8,18 @@
 # Creates OSM file (manual upload to OSM).
 
 import math
-import copy
 import sys
 import time
 import json
 import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
-import utm
-#from xml.etree import ElementTree
 
 
-version = "0.4.0"
+version = "0.4.2"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
 osm_api = "https://api.openstreetmap.org/api/0.6/"  # Production database
-
-coordinate_decimals = 7
 
 margin_haus = 10.0		# Maximum deviation between polygons (meters)
 margin_tagged = 5.0		# Maximum deviation between polygons if building is tagged (meters)
@@ -34,8 +29,8 @@ remove_addr = True 		# Remove addr tags from buildings
 
 # No warnings when replacing these building tags with each other
 similar_buildings = {
-	'residential': ["house", "detached", "residential", "cabin", "farm", "semidetached_house", "terrace", "bungalow", "apartments"],
-	'commercial': ["retail", "commercial", "warehouse", "industrial", "office"]
+	'residential': ["house", "detached", "semidetached_house", "terrace", "farm", "apartments", "residential", "cabin", "hut", "bungalow"],
+	'commercial':  ["retail", "commercial", "warehouse", "industrial", "office"]
 }
 
 debug = False 			# Output extra tags for debugging/testing
@@ -305,6 +300,14 @@ def hausdorff_distance(p1, p2):
 
 
 
+# Transform url characters
+
+def fix_url (url):
+
+	return url.replace("Æ","E").replace("Ø","O").replace("Å","A").replace("æ","e").replace("ø","o").replace("å","a").replace(" ", "_")
+
+
+
 # Identify municipality name, unless more than one hit
 # Returns municipality number, or input paramter if not found
 
@@ -374,7 +377,9 @@ def load_import_buildings(filename):
 		if "STATUS" in building['properties']:
 			del building['properties']['STATUS']
 		if "DATE" in building['properties']:
-			del building['properties']['DATE']	
+			del building['properties']['DATE']
+		if building['properties']['building'] == "barracks":
+			building['properties']['building'] = "container"
 
 	message ("\t%i buildings loaded\n" % len(import_buildings))
 
@@ -810,7 +815,7 @@ if __name__ == '__main__':
 
 	# Get filename
 
-	filename = "bygninger_%s_%s.geojson" % (municipality_id, municipalities[ municipality_id ])
+	filename = "bygninger_%s_%s.geojson" % (municipality_id, fix_url(municipalities[ municipality_id ]))
 
 	for arg in sys.argv[2:]:
 		if ".geojson" in arg:
@@ -829,6 +834,3 @@ if __name__ == '__main__':
 
 	used_time = time.time() - start_time
 	message("Done in %s (%i buildings per second)\n\n" % (timeformat(used_time), len(osm_buildings) / used_time))
-
-
-
