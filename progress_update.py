@@ -26,16 +26,15 @@ overpass_instance = "https://overpass.kumi.systems/api/interpreter"
 
 # Output message to console
 
-def message (text):
+def message(text):
 
 	sys.stderr.write(text)
 	sys.stderr.flush()
 
 
-
 # Open file/api, try up to 5 times, each time with double sleep time
 
-def try_urlopen (url, header):
+def try_urlopen(url, header):
 
 	request = urllib.request.Request(url, headers=header)
 
@@ -72,7 +71,6 @@ def try_urlopen (url, header):
 	sys.exit()
 
 
-
 # Load table from progress page
 
 def load_progress_page():
@@ -87,21 +85,19 @@ def load_progress_page():
 	page.close()
 
 	content = storesoup.find(class_="mw-parser-output")
-	table = content.find("table").find("tbody").find_all("tr", recursive=False)
+	table = content.find("caption", text="Import progress table - Municipalities\n").find_parent("table")
+	table_rows = table.find("tbody").find_all("tr", recursive=False)
 
-	for row in table[2:]:
+	for row in table_rows[2:]:
 		cols = row.find_all('td')
 		cols = [ele.text.strip() for ele in cols]
 
-		if not cols[3]:
-			cols[3] = "0"
-		if not cols[4]:
-			cols[4] = "0"
-		if not cols[5]:
-			cols[5] = "0"
+		for i in (3, 4, 5):
+			if not cols[i]:
+				cols[i] = "0"
 
 		if cols and cols[0] != "9999":
-			municipalities[ cols[0] ] = {
+			municipalities[cols[0]] = {
 				'name': cols[1],
 				'county': cols[2],
 				'import_buildings': int(float(cols[3].replace(" ", ""))),
@@ -113,28 +109,34 @@ def load_progress_page():
 
 	message(f"\t{len(municipalities):d} municipalities\n")
 
-	for city_id, has_id in [("0301", True), ("4601", False)]:
-		city_name = municipalities[city_id]["name"]
-		municipalities[city_id]["subdiv"] = []
-		table = content.select_one(f'h2:-soup-contains("{city_name}") + table').find("tbody").find_all("tr", recursive=False)
+	municipality_ids = {municipality["name"]: municipality_id for municipality_id, municipality in municipalities.items()}
 
-		for row in table[1:]:
-			cols = row.find_all('td')
-			cols = [ele.text.strip() for ele in cols]
+	table = content.find("caption", text="Import progress table - Bydeler\n").find_parent("table")
+	table_rows = table.find("tbody").find_all("tr", recursive=False)
 
-			if not cols[1 + has_id]:
-				cols[1 + has_id] = "0"
+	for row in table_rows[1:]:
+		cols = row.find_all('td')
+		cols = [ele.text.strip() for ele in cols]
 
-			subdiv = {
-				'name': cols[0 + has_id],
-				'osm_buildings': int(cols[1 + has_id].replace(" ", "")),
-				'user': cols[2 + has_id],
-				'status': cols[3 + has_id]
-			}
-			if has_id:
-				subdiv['id'] = cols[0]
+		for i in (2, 3, 4):
+			if not cols[i]:
+				cols[i] = "0"
 
-			municipalities[city_id]["subdiv"].append(subdiv)
+		subdivision = {
+			'name': cols[1],
+			'import_buildings': int(cols[2].replace(" ", "")),
+			'osm_buildings': int(cols[3].replace(" ", "")),
+			'ref_progress': int(cols[4].strip("%").replace(" ", "")),
+			'user': cols[5],
+			'status': cols[6]
+		}
+
+		city_id = municipality_ids[cols[0]]
+
+		if "subdivision" in municipalities[city_id]:
+			municipalities[city_id]["subdivision"].append(subdivision)
+		else:
+			municipalities[city_id]["subdivision"] = [subdivision]
 
 
 # Get buildings from cadastral registry.
@@ -161,14 +163,18 @@ def count_import_buildings():
 
 		# Load file from GeoNorge
 
-		url = f"https://nedlasting.geonorge.no/geonorge/Basisdata/MatrikkelenBygning/GML/Basisdata_{municipality_id}_{municipality['name']}_25833_MatrikkelenBygning_GML.zip"
-		url = url.replace("Æ","E").replace("Ø","O").replace("Å","A").replace("æ","e").replace("ø","o").replace("å","a").replace(" ", "_")
+		url = (
+			"https://nedlasting.geonorge.no/geonorge/Basisdata/MatrikkelenBygning/GML/Basisdata_"
+			f"{municipality_id}_{municipality['name']}_25833_MatrikkelenBygning_GML.zip"
+		)
+		url = url.replace("Æ", " E").replace("Ø", "O").replace(
+			"Å", "A").replace("æ", "e").replace("ø", "o").replace("å", "a").replace(" ", "_")
 
 		in_file = urllib.request.urlopen(url)
 		zip_file = zipfile.ZipFile(BytesIO(in_file.read()))
 
 		if len(zip_file.namelist()) == 0:
-			message ("*** No data\n")
+			message("*** No data\n")
 			continue
 
 		filename = zip_file.namelist()[0]
@@ -181,7 +187,7 @@ def count_import_buildings():
 
 		# Count number of import buildings and compare with last update
 
-		for feature in root.iter('{%s}featureMember' % ns_gml):
+		for _ in root.iter('{%s}featureMember' % ns_gml):
 			count += 1
 
 		message(f"{count:,}".replace(',', ' '))
@@ -193,7 +199,6 @@ def count_import_buildings():
 		total_count += count
 
 	message(f"\tTotal {total_count:d} cadastral buildings in Norway\n")
-
 
 
 # Load count of existing buildings from OSM Overpass
@@ -210,7 +215,11 @@ def count_osm_buildings():
 
 		# Get number of buildings
 
-		query = f'[out:json][timeout:60];(area[ref={municipality_id}][admin_level=7][place=municipality];)->.a;(nwr["building"](area.a););out count;'
+		query = (
+			'[out:json][timeout:60];'
+			f'(area[ref={municipality_id}][admin_level=7][place=municipality];)->.a;'
+			'(nwr["building"](area.a););out count;'
+		)
 
 		url = f'{overpass_instance}?data={urllib.parse.quote(query)}'
 		with try_urlopen(url, request_header) as file:
@@ -222,62 +231,92 @@ def count_osm_buildings():
 
 		message(f"{count_buildings:<6} ")
 
-		time.sleep(20 + count_buildings / sleep_time)
+		time.sleep(5 + count_buildings / sleep_time)
 
 		# Get number of ref:byningsnr tags
 
-		query = '[out:json][timeout:60];(area[ref=%s][admin_level=7][place=municipality];)->.a;(nwr["ref:bygningsnr"](area.a););out count;' \
-			 	% municipality_id
+		query = (
+			'[out:json][timeout:60];'
+			f'(area[ref={municipality_id}][admin_level=7][place=municipality];)->.a;'
+			'(nwr["ref:bygningsnr"](area.a););out count;'
+		)
 
 		url = f'{overpass_instance}?data={urllib.parse.quote(query)}'
 		with try_urlopen(url, request_header) as file:
 			data = json.load(file)
 
 		count_tags = int(data['elements'][0]['tags']['total'])
-		municipality['ref_progress'] = 100 * count_tags / municipality['import_buildings']
+		try:
+			municipality['ref_progress'] = int(100 * count_tags / municipality['import_buildings'])
+		except ZeroDivisionError:
+			municipality['ref_progress'] = 0
 
-		message(f"{count_tags:6d} {int(municipality['ref_progress']):3d}%")
+		message(f"{count_tags:6d} {municipality['ref_progress']:3d}%")
 
 		# Compare with last update
 
 		if count_buildings != municipality['osm_buildings']:
-			message(f"  ⤍ {count_buildings - municipality['osm_buildings']:d}")
+			message(f"  ⟶ {count_buildings - municipality['osm_buildings']:d}")
 		message("\n")
 
 		municipality['osm_buildings'] = count_buildings
 
-		if "subdiv" in municipality:
-			for subdiv in municipality["subdiv"]:
-				time.sleep(5 + count_buildings / sleep_time)
+		time.sleep(5 + count_buildings / sleep_time)
 
-				message(f'\t\tBydel {subdiv["name"]:<20}')
-				query = f'[out:json][timeout:60];(area[name="{subdiv["name"]}"][admin_level=9];)->.a;(nwr["building"](area.a););out count;'
-				url = f'{overpass_instance}?data={urllib.parse.quote(query)}'
-				with try_urlopen(url, request_header) as file:
-					data = json.load(file)
+		for subdivision in municipality.get("subdivision", []):
 
-				count = data['elements'][0]['tags']
-				count_buildings = int(count['ways']) + int(count['relations'])
+			message(f'\t\tBydel {subdivision["name"]:<20}')
+			query = (
+				'[out:json][timeout:60];'
+				f'(area[name="{subdivision["name"]}"][admin_level=9];)->.a;'
+				'(nwr["building"](area.a););out count;'
+				)
 
-				message(f"{count_buildings:>7}")
+			url = f'{overpass_instance}?data={urllib.parse.quote(query)}'
+			with try_urlopen(url, request_header) as file:
+				data = json.load(file)
 
-				if count_buildings != subdiv['osm_buildings']:
-					message(f"  --> {count_buildings - subdiv['osm_buildings']:d}")
-				message("\n")
+			count = data['elements'][0]['tags']
+			count_buildings = int(count['ways']) + int(count['relations'])
 
-				subdiv['osm_buildings'] = count_buildings
+			message(f"{count_buildings:>7}")
 
-	time.sleep(20 + count_buildings / sleep_time)
+			time.sleep(5 + count_buildings / sleep_time)
 
-	message("\tTotal %i OSM buildings in Norway\n" % total_count)
+			query = (
+				'[out:json][timeout:60];'
+				f'(area[name="{subdivision["name"]}"][admin_level=9];)->.a;'
+				'(nwr["ref:bygningsnr"](area.a););out count;'
+			)
 
+			url = f'{overpass_instance}?data={urllib.parse.quote(query)}'
+			with try_urlopen(url, request_header) as file:
+				data = json.load(file)
+
+			count_tags = int(data['elements'][0]['tags']['total'])
+			try:
+				subdivision['ref_progress'] = int(100 * count_tags / subdivision['import_buildings'])
+			except ZeroDivisionError:
+				subdivision['ref_progress'] = 0
+
+			message(f"{count_tags:6d} {subdivision['ref_progress']:3d}%")
+
+			if count_buildings != subdivision['osm_buildings']:
+				message(f"  ⟶ {count_buildings - subdivision['osm_buildings']:d}")
+			message("\n")
+
+			subdivision['osm_buildings'] = count_buildings
+
+			time.sleep(5 + count_buildings / sleep_time)
+
+	message(f"\tTotal {total_count:d} OSM buildings in Norway\n")
 
 
 # Output summary in format suitable for updating wiki page
 
 def output_file():
 
-	message ("\nSummary\n")
+	message("\nSummary\n")
 
 	osm_count = 0
 	import_count = 0
@@ -287,7 +326,11 @@ def output_file():
 
 		for municipality_id, municipality in municipalities.items():
 
-			message(f"\t{municipality_id} {municipality['name']:<15} {municipality['county']:<20} {municipality['import_buildings']:6d} {municipality['osm_buildings']:6d} {municipality['ref_progress']:3d}% {municipality['user']:<10} {municipality['status']:<10}\n")
+			message(
+				f"\t{municipality_id} {municipality['name']:<15} {municipality['county']:<20} "
+				f"{municipality['import_buildings']:6d} {municipality['osm_buildings']:6d} "
+				f"{municipality['ref_progress']:3d}% {municipality['user']:<10} {municipality['status']:<10}\n"
+			)
 
 			file.write("|-\n")
 			file.write(f"|{municipality_id}\n")
@@ -304,24 +347,23 @@ def output_file():
 
 			message(f"\t{'Total in Norway':<41} {import_count:6d} {osm_count:6d}\n\n")
 
-		message(f"\nFile saved to '{filename}'\n\n")
+	message(f"\nFile saved to '{filename}'\n\n")
 
-		for city_id, city in filter(lambda m: "subdiv" in m[1], municipalities.items()):
-			filename = f"import_progress_{city['name']}.txt"
-			with open(filename, "w", encoding='utf-8') as file:
+	filename = f"import_progress_bydeler.txt"
+	with open(filename, "w", encoding='utf-8') as file:
 
-				for subdiv in city["subdiv"]:
-					file.write("|-\n")
-					if 'id' in subdiv:
-						file.write(f"|{subdiv['id']}\n")
-					file.write(f"|{subdiv['name']}\n")
-					file.write(f"|{subdiv['osm_buildings']:,}\n".replace(',', ' '))
-					file.write(f"|{subdiv['user']}\n")
-					file.write(f"|{subdiv['status']}\n")
+		for city in filter(lambda m: "subdivision" in m, municipalities.values()):
+			for subdivision in city["subdivision"]:
+				file.write("|-\n")
+				file.write(f"|{city['name']}\n")
+				file.write(f"|{subdivision['name']}\n")
+				file.write(f"|{subdivision['import_buildings']:,}\n".replace(',', ' '))
+				file.write(f"|{subdivision['osm_buildings']:,}\n".replace(',', ' '))
+				file.write(f"|{subdivision['ref_progress']:d}%\n")
+				file.write(f"|{subdivision['user']}\n")
+				file.write(f"|{subdivision['status']}\n")
 
-
-			message(f"\nFile saved to '{filename}'\n\n")
-
+	message(f"\nFile saved to '{filename}'\n\n")
 
 
 # Main program
