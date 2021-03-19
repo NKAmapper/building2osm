@@ -15,7 +15,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.4.3"
+version = "0.4.4"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -438,7 +438,7 @@ def load_osm_buildings(municipality_id):
 			building['area'] = abs(polygon_area(line))
 
 			for tag in building['tags']:
-				if tag != "building" and "addr:" not in tag:
+				if tag not in ["building", "source"] and "addr:" not in tag:
 					building['tagged'] = True
 			if "tagged" in building:
 				tag_count += 1
@@ -791,6 +791,7 @@ if __name__ == '__main__':
 
 	if len(sys.argv) > 2 and sys.argv[2].isdigit():
 		margin_haus = int(sys.argv[2])
+		margin_tagged = margin_haus * 0.5
 
 	if "-debug" in sys.argv:
 		debug = True
