@@ -351,7 +351,7 @@ def output_file():
 			import_count += municipality['import_buildings']
 			osm_count += municipality['osm_buildings']
 
-			message(f"\t{'Total in Norway':<41} {import_count:6d} {osm_count:6d}\n\n")
+		message(f"\t{'Total in Norway':<41} {import_count:6d} {osm_count:6d}\n\n")
 
 	message(f"\nFile saved to '{filename}'\n\n")
 
