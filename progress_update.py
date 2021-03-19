@@ -15,7 +15,7 @@ from xml.etree import ElementTree as ET
 from bs4 import BeautifulSoup
 
 
-version = "0.1.0"
+version = "0.2.0"
 
 request_header = {"User-Agent": "osmno/buildings2osm"}
 
