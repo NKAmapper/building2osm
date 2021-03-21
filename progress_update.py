@@ -15,7 +15,7 @@ from xml.etree import ElementTree as ET
 from bs4 import BeautifulSoup
 
 
-version = "0.2.0"
+version = "0.3.0"
 
 request_header = {"User-Agent": "osmno/buildings2osm"}
 
@@ -100,15 +100,24 @@ def load_progress_page():
 				cols[i] = "0"
 
 		if cols and cols[0] != "9999":
+			if cols[5].strip() == "":
+				progress = 0
+			elif "%" in cols[5]:
+				progress = int(float(cols[5].strip("%").replace(" ", "")))
+			else:
+				progress = int(cols[5].split("|")[1].strip("}"))
+
 			municipalities[cols[0]] = {
 				'name': cols[1],
 				'county': cols[2],
 				'import_buildings': int(float(cols[3].replace(" ", ""))),
 				'osm_buildings': int(float(cols[4].replace(" ", ""))),
-				'ref_progress': int(float(cols[5].strip("%").replace(" ", ""))),
-				'user': cols[6],
+				'ref_progress': progress,
+				'user': cols[6].strip(),
 				'status': cols[7]
 			}
+
+
 
 	message(f"\t{len(municipalities):d} municipalities\n")
 
@@ -128,12 +137,19 @@ def load_progress_page():
 			if not cols[i]:
 				cols[i] = "0"
 
+		if cols[4].strip() == "":
+			progress = 0
+		elif "%" in cols[4]:
+			progress = int(float(cols[4].strip("%").replace(" ", "")))
+		else:
+			progress = int(cols[4].split("|")[1].strip("}"))
+
 		subdivision = {
 			'name': cols[1],
 			'import_buildings': int(cols[2].replace(" ", "")),
 			'osm_buildings': int(cols[3].replace(" ", "")),
-			'ref_progress': int(cols[4].strip("%").replace(" ", "")),
-			'user': cols[5],
+			'ref_progress': progress,
+			'user': cols[5].strip(),
 			'status': cols[6]
 		}
 
@@ -326,6 +342,7 @@ def output_file():
 
 	osm_count = 0
 	import_count = 0
+	ref_count = 0
 
 	filename = "import_progress.txt"
 	with open(filename, "w", encoding='utf-8') as file:
@@ -344,14 +361,19 @@ def output_file():
 			file.write(f"|{municipality['county']}\n")
 			file.write(f"|{municipality['import_buildings']:,}\n".replace(',', ' '))
 			file.write(f"|{municipality['osm_buildings']:,}\n".replace(',', ' '))
-			file.write(f"|{municipality['ref_progress']:d}%\n")
+			if municipality['ref_progress'] > 0 or municipality['user']:
+				file.write(f"|{{{{Progress|{municipality['ref_progress']:d}}}}}\n")
+			else:
+				file.write("|0%\n")
 			file.write(f"|{municipality['user']}\n")
 			file.write(f"|{municipality['status']}\n")
 
 			import_count += municipality['import_buildings']
 			osm_count += municipality['osm_buildings']
+			ref_count += municipality['ref_progress'] * municipality['import_buildings'] / 100.0
 
-		message(f"\t{'Total in Norway':<41} {import_count:6d} {osm_count:6d}\n\n")
+		ref_count = int(100.0 * ref_count / import_count)
+		message(f"\t{'Total in Norway':<41} {import_count:6d} {osm_count:6d} {ref_count:d}%\n\n")
 
 	message(f"\nFile saved to '{filename}'\n\n")
 
@@ -365,7 +387,10 @@ def output_file():
 				file.write(f"|{subdivision['name']}\n")
 				file.write(f"|{subdivision['import_buildings']:,}\n".replace(',', ' '))
 				file.write(f"|{subdivision['osm_buildings']:,}\n".replace(',', ' '))
-				file.write(f"|{subdivision['ref_progress']:d}%\n")
+				if subdivision['ref_progress'] > 0 or subdivision['user']:
+					file.write(f"|{{{{Progress|{subdivision['ref_progress']:d}}}}}\n")
+				else:
+					file.write("|0%\n")
 				file.write(f"|{subdivision['user']}\n")
 				file.write(f"|{subdivision['status']}\n")
 
@@ -384,3 +409,4 @@ if __name__ == '__main__':
 	count_osm_buildings()
 
 	output_file()
+					   
