@@ -3,6 +3,7 @@
 
 # progress_update
 # Generates wiki progress page content, to be copied to wiki
+# Usage: progress_update.py [<sleep time>]
 
 
 import json
@@ -15,11 +16,13 @@ from xml.etree import ElementTree as ET
 from bs4 import BeautifulSoup
 
 
-version = "0.3.0"
+version = "0.3.1"
 
 request_header = {"User-Agent": "osmno/buildings2osm"}
 
-sleep_time = 1000  # Number of buildings per 1 second sleep time before Overpass requests
+sleep_time = 1  # Fixed sleep time after each Overpass request
+buildings_per_second = 10000  # Number of buildings per 1 second sleep time before Overpass requests
+
 # Faster alternative to https://overpass-api.de/api/interpreter
 overpass_instance = "https://overpass.kumi.systems/api/interpreter"
 
@@ -214,7 +217,7 @@ def count_import_buildings():
 
 		message(f"{count:,}".replace(',', ' '))
 		if count != municipality['import_buildings']:
-			message(f"  ⟶ {count - municipality['import_buildings']:d}")
+			message(f"  -> {count - municipality['import_buildings']:d}")
 		message("\n")
 
 		municipality['import_buildings'] = count
@@ -253,7 +256,7 @@ def count_osm_buildings():
 
 		message(f"{count_buildings:<6} ")
 
-		time.sleep(5 + count_buildings / sleep_time)
+		time.sleep(sleep_time + count_buildings / buildings_per_second)
 
 		# Get number of ref:byningsnr tags
 
@@ -278,12 +281,12 @@ def count_osm_buildings():
 		# Compare with last update
 
 		if count_buildings != municipality['osm_buildings']:
-			message(f"  ⟶ {count_buildings - municipality['osm_buildings']:d}")
+			message(f"  -> {count_buildings - municipality['osm_buildings']:d}")
 		message("\n")
 
 		municipality['osm_buildings'] = count_buildings
 
-		time.sleep(5 + count_buildings / sleep_time)
+		time.sleep(sleep_time + count_buildings / buildings_per_second)
 
 		for subdivision in municipality.get("subdivision", []):
 
@@ -303,7 +306,7 @@ def count_osm_buildings():
 
 			message(f"{count_buildings:>7}")
 
-			time.sleep(5 + count_buildings / sleep_time)
+			time.sleep(sleep_time + count_buildings / buildings_per_second)
 
 			query = (
 				'[out:json][timeout:60];'
@@ -324,12 +327,12 @@ def count_osm_buildings():
 			message(f"{count_tags:6d} {subdivision['ref_progress']:3d}%")
 
 			if count_buildings != subdivision['osm_buildings']:
-				message(f"  ⟶ {count_buildings - subdivision['osm_buildings']:d}")
+				message(f"  -> {count_buildings - subdivision['osm_buildings']:d}")
 			message("\n")
 
 			subdivision['osm_buildings'] = count_buildings
 
-			time.sleep(5 + count_buildings / sleep_time)
+			time.sleep(sleep_time + count_buildings / buildings_per_second)
 
 	message(f"\tTotal {total_count:d} OSM buildings in Norway\n")
 
@@ -401,12 +404,17 @@ def output_file():
 
 if __name__ == '__main__':
 
+	if len(sys.argv) > 1 and sys.argv[1].isdigit():
+		sleep_time = float(sys.argv[1])
+		buildings_per_second = 10000 / sleep_time
+
 	municipalities = {}
 
 	load_progress_page()
 
-	count_import_buildings()
 	count_osm_buildings()
-
 	output_file()
-					   
+
+	count_import_buildings()
+	output_file()
+		   
