@@ -15,7 +15,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.4.4"
+version = "0.4.5"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -370,8 +370,18 @@ def load_import_buildings(filename):
 			del building['properties']['STATUS']
 		if "DATE" in building['properties']:
 			del building['properties']['DATE']
+
+		# Temporary fixes
+
 		if building['properties']['building'] == "barracks":
 			building['properties']['building'] = "container"
+		if building['properties']['building'] == "hotel" and "area" in building and building['area'] < 100:
+			building['properties']['building'] = "cabin"
+		if building['properties']['building'] in ["garage", "barn"] and "area" in building and building['area'] < 15:
+			building['properties']['building'] = "shed"
+		if building['properties']['building'] == "barn" and "area" in building and building['area'] < 100:
+			building['properties']['building'] = "farm_auxiliary"
+
 
 	message ("\t%i buildings loaded\n" % len(import_buildings))
 
