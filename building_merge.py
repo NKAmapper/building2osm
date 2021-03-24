@@ -15,7 +15,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.4.5"
+version = "0.4.6"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -712,12 +712,13 @@ def set_attributes (element, data):
 		element.set('user', data['user'])
 		element.set('uid', str(data['uid']))
 		element.set('timestamp', data['timestamp'])
-		element.set('changset', str(data['changeset']))
+		element.set('changeset', str(data['changeset']))
 		element.set('visible', 'true')
 		if "action" in data:
 			element.set('action', data['action'])
 	else:
-		element.set('version', '1')
+		element.set('action', 'modify')
+		element.set('visible', 'true')
 
 
 
@@ -837,3 +838,6 @@ if __name__ == '__main__':
 
 	used_time = time.time() - start_time
 	message("Done in %s (%i buildings per second)\n\n" % (timeformat(used_time), len(osm_buildings) / used_time))
+
+
+
