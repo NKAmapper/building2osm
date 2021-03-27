@@ -192,17 +192,17 @@ def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord,
 
 	cx = 0.
 	cy = 0.
-	area_sum = 0.
+	det = 0.
 
 	for (xi, yi), (xj, yj) in pairwise(linear_ring):
-		area_sum += (a := xi * yj - xj * yi)
-		cx += (xi + xj) * a
-		cy += (yi + yj) * a
+		det += (d := xi * yj - xj * yi)
+		cx += (xi + xj) * d
+		cy += (yi + yj) * d
 
-	area = area_sum / 2
-	area_factor = 6 * area
+	area = det / 2
+	area_factor = 3 * det
 	center_point = cx / area_factor, cy / area_factor
-	return center_point, area
+	return center_point, abs(area)
 
 
 def inside_multipolygon(point: PointCoord, multipolygon: MultipolygonCoord):
