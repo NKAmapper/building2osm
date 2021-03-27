@@ -6,10 +6,9 @@
 # Usage: buildings2osm.py <municipality name> [-original] [-verify] [-debug]
 # Creates geojson file with name "bygninger_4222_Bykle.osm" etc.
 
-
+from typing import Tuple, List
 import sys
 import time
-import copy
 import math
 import statistics
 import csv
@@ -20,6 +19,7 @@ from io import TextIOWrapper
 from io import BytesIO
 from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
+from city_subdivisions import cities_id, city_subdivisions_request, osm_type_sorter, overpass2features
 
 
 version = "0.5.0"
@@ -62,18 +62,23 @@ status_codes = {
 }
 
 
+PointCoord = Tuple[float, float]
+LinearRingCoord = List[PointCoord]
+PolygonCoord = List[LinearRingCoord]
+MultipolygonCoord = List[PolygonCoord]
+
+
 # Output message to console
 
-def message (text):
+def message(text):
 
 	sys.stderr.write(text)
 	sys.stderr.flush()
 
 
-
 # Format time
 
-def timeformat (sec):
+def timeformat(sec):
 
 	if sec > 3600:
 		return "%i:%02i:%02i hours" % (sec / 3600, (sec % 3600) / 60, sec % 60)
@@ -81,7 +86,6 @@ def timeformat (sec):
 		return "%i:%02i minutes" % (sec / 60, sec % 60)
 	else:
 		return "%i seconds" % sec
-
 
 
 # Format decimal number
@@ -95,11 +99,30 @@ def format_decimal(number):
 		return ""
 
 
+def pairwise(iterable):
+	iterator = iter(iterable)
+	ia = next(iterator)
+
+	for ib in iterator:
+		yield ia, ib
+		ia = ib
+
+
+def add_first_to_last(iterable):
+	iterator = iter(iterable)
+	first = next(iterator)
+	yield first
+
+	for i in iterator:
+		yield i
+
+	yield first
+
 
 # Compute approximation of distance between two coordinates, (lat,lon), in meters
 # Works for short distances
 
-def distance (point1, point2):
+def distance(point1: PointCoord, point2: PointCoord):
 
 	lon1, lat1, lon2, lat2 = map(math.radians, [point1[0], point1[1], point2[0], point2[1]])
 	x = (lon2 - lon1) * math.cos( 0.5*(lat2+lat1) )
@@ -107,83 +130,118 @@ def distance (point1, point2):
 	return 6371000.0 * math.sqrt( x*x + y*y )  # Metres
 
 
+def area_polygon(polygon: PolygonCoord):
+	area = abs(area_linear_ring(polygon[0]))
+	for inner_ring in polygon[1:]:
+		area -= abs(area_linear_ring(inner_ring))
+	return area
 
-# Calculate coordinate area of polygon in square meters
+
+# Calculate coordinate area of simple polygon in square meters
 # Simple conversion to planar projection, works for small areas
 # < 0: Clockwise
 # > 0: Counter-clockwise
 # = 0: Polygon not closed
 
-def polygon_area (polygon):
+def area_linear_ring(linear_ring: LinearRingCoord):
 
-	if polygon[0] == polygon[-1]:
-		lat_dist = math.pi * 6371000.0 / 180.0
+	if linear_ring[0] != linear_ring[-1]:
+		linear_ring = add_first_to_last(linear_ring)
 
-		coord = []
-		for node in polygon:
-			y = node[1] * lat_dist
-			x = node[0] * lat_dist * math.cos(math.radians(node[1]))
-			coord.append((x,y))
+	lat_dist = math.pi * 6371000.0 / 180.0
 
-		area = 0.0
-		for i in range(len(coord) - 1):
-			area += (coord[i+1][0] - coord[i][0]) * (coord[i+1][1] + coord[i][1])  # (x2-x1)(y2+y1)
+	coord = []
+	for node in linear_ring:
+		y = node[1] * lat_dist
+		x = node[0] * lat_dist * math.cos(math.radians(node[1]))
+		coord.append((x, y))
 
-		return int(area / 2.0)
-	else:
-		return 0
+	area = 0.0
+	for (xi, yi), (xj, yj) in pairwise(coord):
+		area += xi * yj - xj * yi
+
+	return area / 2
 
 
+# Calculate mass centre of polygon
+def centroid_polygon(polygon: PolygonCoord) -> PointCoord:
+	center_point, outer_area = centroid_area_linear_ring(polygon[0])
+	if inner_rings := polygon[1:]:
+		cx = center_point[0] * outer_area
+		cy = center_point[1] * outer_area
+		area_sum = outer_area
+		for inner_ring in inner_rings:
+			inner_cp, inner_area = centroid_area_linear_ring(inner_ring)
+			cx -= center_point[0] * inner_area
+			cy -= center_point[1] * inner_area
+			area_sum -= inner_area
+		center_point = (cx / area_sum, cy / area_sum)
+	return center_point
 
-# Calculate centre of polygon, or of list of nodes
 
-def polygon_centre (polygon):
+def centroid_linear_ring(linear_ring: LinearRingCoord) -> PointCoord:
+	center_point, _ = centroid_area_linear_ring(linear_ring)
+	return center_point
 
-	length = len(polygon)
-	if polygon[0] == polygon[-1]:
-		length -= 1
 
-	x = 0
-	y = 0
-	for node in polygon[:length]:
-		x += node[0]
-		y += node[1]
-	return (x / length, y / length)
+# Area necessary to calculate mass center of a polygon with holes.
+def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord, float]:
 
+	if linear_ring[0] != linear_ring[-1]:
+		linear_ring = add_first_to_last(linear_ring)
+
+	cx = 0.
+	cy = 0.
+	area_sum = 0.
+
+	for (xi, yi), (xj, yj) in pairwise(linear_ring):
+		area_sum += (a := xi * yj - xj * yi)
+		cx += (xi + xj) * a
+		cy += (yi + yj) * a
+
+	area = area_sum / 2
+	area_factor = 6 * area
+	center_point = cx / area_factor, cy / area_factor
+	return center_point, area
+
+
+def inside_multipolygon(point: PointCoord, multipolygon: MultipolygonCoord):
+	inside = any(inside_polygon(point, polygon) for polygon in multipolygon)
+	return inside
+
+
+def inside_polygon(point: PointCoord, polygon: PolygonCoord):
+	inside = inside_linear_ring(point, polygon[0])
+	if inside:
+		for inner_ring in polygon[1:]:
+			if inside_linear_ring(point, inner_ring):
+				inside = False
+	return inside
 
 
 # Tests whether point (x,y) is inside a polygon
 # Ray tracing method
+def inside_linear_ring(point: PointCoord, linear_ring: LinearRingCoord):
 
-def inside_polygon (point, polygon):
+	if linear_ring[0] != linear_ring[-1]:
+		linear_ring = add_first_to_last(linear_ring)
 
-	if polygon[0] == polygon[-1]:
-		x, y = point
-		n = len(polygon)
-		inside = False
+	px, py = point
+	inside = False
 
-		p1x, p1y = polygon[0]
-		for i in range(n):
-			p2x, p2y = polygon[i]
-			if y > min(p1y, p2y):
-				if y <= max(p1y, p2y):
-					if x <= max(p1x, p2x):
-						if p1y != p2y:
-							xints = (y-p1y) * (p2x-p1x) / (p2y-p1y) + p1x
-						if p1x == p2x or x <= xints:
-							inside = not inside
-			p1x, p1y = p2x, p2y
+	for (xi, yi), (xj, yj) in pairwise(linear_ring):
+		if (
+				((yi > py) != (yj > py)) and
+				(px < (xj - xi) * (py - yi) / (yj - yi) + xi)
+		):
+			inside = not inside
 
-		return inside
-
-	else:
-		return False
-
+	return inside
 
 
 # Return bearing in degrees of line between two points (longitude, latitude)
 
-def bearing (point1, point2):
+def bearing (point1: PointCoord, point2: PointCoord):
 
 	lon1, lat1, lon2, lat2 = map(math.radians, [point1[0], point1[1], point2[0], point2[1]])
 	dLon = lon2 - lon1
@@ -191,7 +249,6 @@ def bearing (point1, point2):
 	x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon)
 	angle = (math.degrees(math.atan2(y, x)) + 360) % 360
 	return angle
-
 
 
 # Return the difference between two bearings.
@@ -207,7 +264,6 @@ def bearing_difference (bearing1, bearing2):
 	return delta
 
 
-
 # Return the shift in bearing at a junction.
 # Negative degrees to the left, positive to the right. 
 
@@ -219,11 +275,10 @@ def bearing_turn (point1, point2, point3):
 	return bearing_difference(bearing1, bearing2)
 
 
-
 # Rotate point with specified angle around axis point.
 # https://gis.stackexchange.com/questions/246258/transforming-data-from-a-rotated-pole-lat-lon-grid-into-regular-lat-lon-coordina
 
-def rotate_node (axis, r_angle, point):
+def rotate_node(axis, r_angle, point):
 
 	r_radians = math.radians(r_angle)  # *(math.pi/180)
 
@@ -237,7 +292,6 @@ def rotate_node (axis, r_angle, point):
 	ynew = yrot + axis[1]
 
 	return (xnew, ynew)
-
 
 
 # Compute closest distance from point p3 to line segment [s1, s2].
@@ -561,7 +615,7 @@ def load_coordinates_municipality(municipality_id):
 	for building in buildings.values():
 		if building['geometry']['type'] == "Polygon" and "building" in building['properties'] and \
 				building['properties']['building'] == "garage" and \
-				abs(polygon_area(building['geometry']['coordinates'][0])) > 100:
+				area_polygon(building['geometry']['coordinates']) > 100:
 			building['properties']['building'] = "garages"
 
 	count_polygons = sum((building['geometry']['type'] == "Polygon") for building in buildings.values())
@@ -729,9 +783,9 @@ def assign_levels_to_building(main_levels, roof_levels, point):
 	for ref, building in iter(buildings.items()):
 		if min_lon < building['centre'][0] < max_lon and min_lat < building['centre'][1] < max_lat:
 			if building['geometry']['type'] == "Polygon" and \
-					building['properties']['building'] in ['apartments', 'residential', 'dormitory', 'terrace', 'semidetached_house', \
+					building['properties']['building'] in ['apartments', 'residential', 'dormitory', 'terrace', 'semidetached_house',
 															'civic', 'commercial', 'retail', 'office', 'house', 'farm', 'cabin'] and \
-					inside_polygon(point, building['geometry']['coordinates'][0]):
+					inside_polygon(point, building['geometry']['coordinates']):
 				found_ref = ref
 				break
 
@@ -1189,7 +1243,7 @@ def rectify_buildings():
 			group_bearing = statistics.median_low(bearings)
 
 		# Compute centre for rotation, average of all corner nodes in cluster of buildings
-		axis = polygon_centre(list(corners.keys()))
+		axis = centroid_linear_ring(list(corners.keys()))
 
 		# Compute median bearing, by which buildings will be rotatatet
 
@@ -1315,12 +1369,11 @@ def rectify_buildings():
 	message ("\t%i buildings could not be rectified\n" % count_not_rectify)
 
 
-
 # Ouput geojson file
 
-def save_file(municipality_id, municipality_name):
+def save_file(buildings, municipality_id, municipality_name):
 
-	filename = "bygninger_" + municipality_id + "_" + municipalities[municipality_id].replace(" ", "_") + ".geojson"
+	filename = "bygninger_" + municipality_id + "_" + municipality_name.replace(" ", "_") + ".geojson"
 	if debug:
 		filename = filename.replace(".geojson", "_debug.geojson")
 	elif verify:
@@ -1379,6 +1432,40 @@ def save_file(municipality_id, municipality_name):
 	message ("\tSaved %i buildings\n" % count)
 
 
+def building_center(building):
+	if 'center' not in building:
+		if building['geometry']['type'] == "Polygon":
+			building['center'] = centroid_polygon(building['geometry']['coordinates'])
+		elif building['geometry']['type'] == "Point":
+			building['center'] = building['geometry']['coordinates']
+
+	return building['center']
+
+
+def buildings_inside_polygon(buildings, polygon):
+	if polygon['type'] == "Multipolygon":
+		inside_func = inside_multipolygon
+	else:
+		inside_func = inside_polygon
+
+	polygon_coord = polygon['coordinates']
+
+	return dict(filter(
+		lambda key_value: inside_func(building_center(key_value[1]), polygon_coord),
+		buildings.items()
+	))
+
+
+def process_city(city_id):
+	overpass_json = city_subdivisions_request(city_id)
+	nodes, ways, relations = osm_type_sorter(overpass_json['elements'])
+
+	city_subdivision = overpass2features(nodes, ways, relations)
+	for subdivision in city_subdivision:
+		bydel_name = f"bydel {subdivision['properties']['name']}"
+		buildings_inside = buildings_inside_polygon(buildings, subdivision['geometry'])
+		save_file(buildings_inside, city_id, bydel_name)
+
 
 def process_municipality(municipality_id, municipality_name):
 
@@ -1400,10 +1487,12 @@ def process_municipality(municipality_id, municipality_name):
 			rectify_buildings()
 			simplify_buildings()
 
-		save_file(municipality_id, municipality_name)
+		if municipality_id in cities_id:
+			process_city(municipality_id)
+		else:
+			save_file(buildings, municipality_id, municipality_name)
 
 		message("Done in %s\n\n" % timeformat(time.time() - num_start_time))
-
 
 
 # Main program

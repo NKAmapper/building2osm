@@ -1,5 +1,6 @@
 import requests  # Bruker requests - midlertidig. Fordi det er det biblioteket jeg kjenner best
 import json
+import urllib.request
 from collections import defaultdict
 from typing import List, TypedDict, Dict, Literal
 
@@ -32,6 +33,7 @@ class Node(TypedDict):
 	tags: Dict[str, str]
 
 
+cities_id = ["0301", "1103", "4601", "5001"]
 osm_api = "https://overpass.kumi.systems/api/interpreter"
 query_template = """
 [out:json][timeout:40];
@@ -43,15 +45,10 @@ out skel qt;
 """
 
 
-def list_of_dict_iter(iterable, key):
-	for i in iterable:
-		yield i[key]
-
-
-def bydel_requests(session: requests.Session, city: str):
-	params = {"data": query_template.format(city)}
-	repons = session.get(osm_api, params=params)
-	return repons.json()
+def city_subdivisions_request(city_id: str):
+	url = f'{osm_api}?data={urllib.parse.quote(query_template.format(city_id))}'
+	response = urllib.request.urlopen(url)
+	return json.load(response)
 
 
 def osm_type_sorter(elements):
@@ -121,8 +118,8 @@ def linear_rings_assembler(relation_ways: List[Way]):
 
 def polygon_assembler(
 		members: List[RelationMember],
-		all_ways: Dict[int, Way],
-		all_nodes: Dict[int, Node]
+		ways: Dict[int, Way],
+		nodes: Dict[int, Node]
 ):
 	outer_way = []
 	inner_way = []
@@ -134,11 +131,11 @@ def polygon_assembler(
 	})
 
 	for member in filter(lambda m: m['type'] == 'way', members):
-		way = all_ways[member['ref']]
+		way = ways[member['ref']]
 		switch[member['role']].append(way)
 
 	rings = [
-		[((node := all_nodes[node_id])['lon'], node['lat']) for node_id in ring]
+		[((node := nodes[node_id])['lon'], node['lat']) for node_id in ring]
 		for ring in linear_rings_assembler(outer_way)
 	]
 	if len(rings) > 1:
@@ -150,16 +147,16 @@ def polygon_assembler(
 		geometry_type = "Polygon"
 		if inner_way:
 			rings.extend(
-				[((node := all_nodes[node_id])['lon'], node['lat']) for node_id in ring]
+				[((node := nodes[node_id])['lon'], node['lat']) for node_id in ring]
 				for ring in linear_rings_assembler(inner_way))
 
 	return rings, geometry_type
 
 
-def relation_iterator(
-		relations: Dict[int, Relation],
+def overpass2features(
+		nodes: Dict[int, Node],
 		ways: Dict[int, Way],
-		nodes: Dict[int, Node]
+		relations: Dict[int, Relation]
 ):
 	for relation in relations.values():
 		coordinates, geometry_type = polygon_assembler(relation['members'], ways, nodes)
@@ -170,13 +167,13 @@ def relation_iterator(
 
 def overpass2geojson(overpass_json):
 	nodes, ways, relations = osm_type_sorter(overpass_json['elements'])
-	features = list(relation_iterator(relations, ways, nodes))
+	features = list(overpass2features(nodes, ways, relations))
 	return {"type": "FeatureCollection", "features": features}
 
 
 if __name__ == "__main__":
 	geojson = overpass2geojson(
-		bydel_requests(requests.Session(), '0301')
+		city_subdivisions_request(cities_id[0])
 	)
-	with open('Oslo.geojson', 'w', encoding='utf-8') as file:
+	with open('oslo.geojson', 'w', encoding='utf-8') as file:
 		file.write(json.dumps(geojson, indent=2))
