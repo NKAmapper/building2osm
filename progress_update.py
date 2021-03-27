@@ -16,7 +16,7 @@ from xml.etree import ElementTree as ET
 from bs4 import BeautifulSoup
 
 
-version = "0.3.1"
+version = "0.3.2"
 
 request_header = {"User-Agent": "osmno/buildings2osm"}
 
@@ -25,6 +25,8 @@ buildings_per_second = 10000  # Number of buildings per 1 second sleep time befo
 
 # Faster alternative to https://overpass-api.de/api/interpreter
 overpass_instance = "https://overpass.kumi.systems/api/interpreter"
+
+norway_id = "9999"
 
 
 # Output message to console
@@ -89,7 +91,7 @@ def load_progress_page():
 
 	content = storesoup.find(class_="mw-parser-output")
 	table = content.find("caption", text="Import progress table - Municipalities\n").find_parent("table")
-	table_rows = table.find("tbody").find_all("tr", recursive=False)[2:]
+	table_rows = table.find("tbody").find_all("tr", recursive=False)[1:]  # [2:]
 
 	for row in table_rows:
 		cols = [
@@ -102,27 +104,27 @@ def load_progress_page():
 			if not cols[i]:
 				cols[i] = "0"
 
-		if cols and cols[0] != "9999":
-			if cols[5].strip() == "":
-				progress = 0
-			elif "%" in cols[5]:
-				progress = int(float(cols[5].strip("%").replace(" ", "")))
-			else:
-				progress = int(cols[5].split("|")[1].strip("}"))
+#		if cols and cols[0] != norway_id:
+		if cols[5].strip() == "":
+			progress = 0
+		elif "%" in cols[5]:
+			progress = int(float(cols[5].strip("%").replace(" ", "")))
+		else:
+			progress = int(cols[5].split("|")[1].strip("}"))
 
-			municipalities[cols[0]] = {
-				'name': cols[1],
-				'county': cols[2],
-				'import_buildings': int(float(cols[3].replace(" ", ""))),
-				'osm_buildings': int(float(cols[4].replace(" ", ""))),
-				'ref_progress': progress,
-				'user': cols[6].strip(),
-				'status': cols[7]
-			}
+		municipalities[cols[0]] = {
+			'name': cols[1],
+			'county': cols[2],
+			'import_buildings': int(float(cols[3].replace(" ", ""))),
+			'osm_buildings': int(float(cols[4].replace(" ", ""))),
+			'ref_progress': progress,
+			'user': cols[6].strip(),
+			'status': cols[7]
+		}
 
 
 
-	message(f"\t{len(municipalities):d} municipalities\n")
+	message(f"\t{(len(municipalities)-1):d} municipalities\n")
 
 	municipality_ids = {municipality["name"]: municipality_id for municipality_id, municipality in municipalities.items()}
 
@@ -184,6 +186,9 @@ def count_import_buildings():
 
 	for municipality_id, municipality in municipalities.items():
 
+		if municipality_id == norway_id:
+			continue
+
 		message(f"\t{municipality['name']:<20} ")
 
 		# Load file from GeoNorge
@@ -200,6 +205,7 @@ def count_import_buildings():
 
 		if len(zip_file.namelist()) == 0:
 			message("*** No data\n")
+			total_count += municipality['import_buildings']
 			continue
 
 		filename = zip_file.namelist()[0]
@@ -225,6 +231,8 @@ def count_import_buildings():
 
 	message(f"\tTotal {total_count:d} cadastral buildings in Norway\n")
 
+	municipalities[ norway_id ]['import_buildings'] = total_count  # Norway
+
 
 # Load count of existing buildings from OSM Overpass
 
@@ -233,8 +241,12 @@ def count_osm_buildings():
 	message("\nLoading existing buildings from OSM ...\n")
 
 	total_count = 0
+	total_tags = 0
 
 	for municipality_id, municipality in municipalities.items():
+
+		if municipality_id == norway_id:
+			continue
 
 		message(f"\t{municipality['name']:<20} ")
 
@@ -271,6 +283,7 @@ def count_osm_buildings():
 			data = json.load(file)
 
 		count_tags = int(data['elements'][0]['tags']['total'])
+		total_tags += count_tags
 		try:
 			municipality['ref_progress'] = int(100 * count_tags / municipality['import_buildings'])
 		except ZeroDivisionError:
@@ -336,6 +349,9 @@ def count_osm_buildings():
 
 	message(f"\tTotal {total_count:d} OSM buildings in Norway\n")
 
+	municipalities[ norway_id ]['osm_buildings'] = total_count  # Norway
+	municipalities[ norway_id ]['ref_progress'] = int(100 * total_tags / municipalities[ norway_id ]['import_buildings'])
+
 
 # Output summary in format suitable for updating wiki page
 
@@ -371,14 +387,15 @@ def output_file():
 			file.write(f"|{municipality['user']}\n")
 			file.write(f"|{municipality['status']}\n")
 
-			import_count += municipality['import_buildings']
-			osm_count += municipality['osm_buildings']
-			ref_count += municipality['ref_progress'] * municipality['import_buildings'] / 100.0
+			if municipality_id != norway_id:
+				import_count += municipality['import_buildings']
+				osm_count += municipality['osm_buildings']
+				ref_count += municipality['ref_progress'] * municipality['import_buildings'] / 100.0
 
 		ref_count = int(100.0 * ref_count / import_count)
 		message(f"\t{'Total in Norway':<41} {import_count:6d} {osm_count:6d} {ref_count:d}%\n\n")
 
-	message(f"\nFile saved to '{filename}'\n\n")
+	message(f"\nFile saved to '{filename}'\n")
 
 	filename = f"import_progress_bydeler.txt"
 	with open(filename, "w", encoding='utf-8') as file:
@@ -397,7 +414,7 @@ def output_file():
 				file.write(f"|{subdivision['user']}\n")
 				file.write(f"|{subdivision['status']}\n")
 
-	message(f"\nFile saved to '{filename}'\n\n")
+	message(f"File saved to '{filename}'\n")
 
 
 # Main program
@@ -412,9 +429,10 @@ if __name__ == '__main__':
 
 	load_progress_page()
 
+	count_import_buildings()
+	output_file()
+
 	count_osm_buildings()
 	output_file()
 
-	count_import_buildings()
-	output_file()
-		   
+	message ("Done\n\n")
