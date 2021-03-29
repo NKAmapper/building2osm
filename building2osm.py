@@ -22,7 +22,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.5.0"
+version = "0.5.1"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -557,12 +557,24 @@ def load_coordinates_municipality(municipality_id):
 
 	count_load = load_area(municipality_id, bbox[0], bbox[2], 1, force_divide=False)  # Start with full bbox
 
-	# Adjust garage tagging according to size
+	# Adjust building tagging according to size
+
 	for building in buildings.values():
 		if building['geometry']['type'] == "Polygon" and "building" in building['properties'] and \
-				building['properties']['building'] == "garage" and \
-				abs(polygon_area(building['geometry']['coordinates'][0])) > 100:
-			building['properties']['building'] = "garages"
+				building['properties']['building'] in ["garage", "barn", "hotel"]:
+
+			area = abs(polygon_area(building['geometry']['coordinates'][0]))
+			if building['properties']['building'] == "garage" and area > 100:
+				building['properties']['building'] = "garages"
+
+			elif building['properties']['building'] in ["garage", "barn"] and area < 15:
+				building['properties']['building'] = "shed"
+
+			elif building['properties']['building'] == "barn" and area < 100:
+				building['properties']['building'] = "farm_auxiliary"
+
+			elif building['properties']['building'] == "hotel" and area < 100:
+				building['properties']['building'] = "cabin"
 
 	count_polygons = sum((building['geometry']['type'] == "Polygon") for building in buildings.values())
 	message ("\r\tLoaded %i building polygons with %i load queries\n" % (count_polygons, count_load))
@@ -1382,7 +1394,7 @@ def save_file(municipality_id, municipality_name):
 
 def process_municipality(municipality_id, municipality_name):
 
-	num_start_time = time.time()
+	mun_start_time = time.time()
 	message ("Municipality: %s %s\n\n" % (municipality_id, municipality_name))
 
 	buildings.clear()
@@ -1402,7 +1414,9 @@ def process_municipality(municipality_id, municipality_name):
 
 		save_file(municipality_id, municipality_name)
 
-		message("Done in %s\n\n" % timeformat(time.time() - num_start_time))
+		message("Done in %s\n\n" % timeformat(time.time() - mun_start_time))
+	else:
+		failed_runs.append(municipality_name)
 
 
 
@@ -1418,6 +1432,7 @@ if __name__ == '__main__':
 	buildings = {}
 	neighbour_buildings = []
 	remove_nodes = set()
+	failed_runs = []
 
 	# Parse parameters
 
@@ -1455,5 +1470,7 @@ if __name__ == '__main__':
 			if len(mun_id) == 4 and mun_id[0:2] == municipality_id or municipality_id == "00":
 				process_municipality(mun_id, municipalities[ mun_id])
 		message("%s done in %s\n\n" % (municipalities[municipality_id], timeformat(time.time() - start_time)))
+		if failed_runs:
+			message ("*** Failed runs: %s\n\n" % (", ".join(failed_runs)))
 	else:
 		process_municipality(municipality_id, municipalities[ municipality_id ])
