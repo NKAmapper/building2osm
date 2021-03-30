@@ -15,7 +15,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.4.6"
+version = "0.4.7"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -223,7 +223,7 @@ def polygon_centroid (polygon):
 		x = x / (3.0 * det)
 		y = y / (3.0 * det)
 
-		return (x / (3.0 * det), y / (3.0 * det) )
+		return (x, y)
 
 	else:
 		return None
@@ -372,6 +372,9 @@ def load_import_buildings(filename):
 			del building['properties']['DATE']
 
 		# Temporary fixes
+
+		if "#672 " in building['properties']['TYPE']:
+			building['properties']['building'] = "religious"
 
 		if building['properties']['building'] == "barracks":
 			building['properties']['building'] = "container"
@@ -569,6 +572,9 @@ def add_building(building, osm_element):
 		
 		if osm_element is not None:
 			way_element['action'] = "modify"
+
+#		centroid = polygon_centroid(building['geometry']['coordinates'][0])
+#		add_node(centroid, {'CENTROID': "yes"})
 
 	# Multipolygon
 
@@ -838,6 +844,3 @@ if __name__ == '__main__':
 
 	used_time = time.time() - start_time
 	message("Done in %s (%i buildings per second)\n\n" % (timeformat(used_time), len(osm_buildings) / used_time))
-
-
-
