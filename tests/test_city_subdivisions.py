@@ -1,5 +1,4 @@
-from city_subdivisions import linear_rings_assembler, polygon_assembler
-from building2osm import buildings_inside_polygon
+from city_subdivisions import linear_rings_assembler, polygon_assembler, buildings_inside_subdivision
 
 relation_ways = [
 	{"id": 500, "nodes": [1, 2, 3]},
@@ -34,14 +33,14 @@ relations = {relation['id']: relation}
 building = {
 	"geometry": {
 		"type": "Polygon",
-		"coordinates": [
+		"coordinates": [[
 			(10.8157456, 59.9070814), (10.8159926, 59.9071256), (10.8159148, 59.907235),
 			(10.8157071, 59.9071979), (10.8157184, 59.9071819), (10.8157184, 59.9071819),
 			(10.8157456, 59.9070814)
-		]},
-	# "center": (10.8158335, 59.9071575)
+		]]},
+	"center": (10.8158335, 59.9071575)
 }
-buildings = {53: building}
+buildings = [building]
 
 
 def test_ring():
@@ -61,5 +60,8 @@ def test_polygon():
 
 def test_buildings_inside_polygon():
 	coordinates, geometry_type = polygon_assembler(relation_members, test_ways, test_nodes)
-	polygon = {'type': geometry_type, 'coordinates': coordinates}
-	assert buildings_inside_polygon(buildings, polygon)
+	subdivision = {
+		'type': 'Feature',
+		'geometry': {'type': geometry_type, 'coordinates': coordinates}
+	}
+	assert buildings_inside_subdivision(buildings, subdivision)

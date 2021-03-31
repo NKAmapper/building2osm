@@ -1,8 +1,8 @@
-import requests  # Bruker requests - midlertidig. Fordi det er det biblioteket jeg kjenner best
+import requests
 import json
-import urllib.request
+import argparse
 from collections import defaultdict
-from typing import List, TypedDict, Dict, Literal
+from typing import Tuple, List, Iterable, Iterator, TypedDict, Dict, Literal, Union
 
 
 class RelationMember(TypedDict):
@@ -33,7 +33,53 @@ class Node(TypedDict):
 	tags: Dict[str, str]
 
 
-cities_id = ["0301", "1103", "4601", "5001"]
+OsmElement = Union[Node, Way, Relation]
+
+
+class OverpassResponse(TypedDict):
+	version: float
+	generator: str
+	osm3s: Dict[str, str]
+	elements: List[OsmElement]
+
+
+PointCoord = Tuple[float, float]
+LinearRingCoord = List[PointCoord]
+PolygonCoord = List[LinearRingCoord]
+MultipolygonCoord = List[PolygonCoord]
+
+
+class PointGeometry(TypedDict):
+	type: Literal['Point']
+	coordinates: PointCoord
+
+
+class PolygonGeometry(TypedDict):
+	type: Literal['Polygon']
+	coordinates: PolygonCoord
+
+
+class MultipolygonGeometry(TypedDict):
+	type: Literal['Multipolygon']
+	coordinates: MultipolygonCoord
+
+
+class Feature(TypedDict):
+	type: Literal['Feature']
+	geometry: Union[
+		PointGeometry,
+		PolygonGeometry,
+		MultipolygonGeometry
+	]
+	properties: Dict[str, str]
+
+
+class FeatureCollection(TypedDict):
+	type: Literal['FeatureCollection']
+	features: List[Feature]
+
+
+city_with_bydel_id = {"0301", "1103", "4601", "5001"}
 osm_api = "https://overpass.kumi.systems/api/interpreter"
 query_template = """
 [out:json][timeout:40];
@@ -45,13 +91,98 @@ out skel qt;
 """
 
 
-def city_subdivisions_request(city_id: str):
-	url = f'{osm_api}?data={urllib.parse.quote(query_template.format(city_id))}'
-	response = urllib.request.urlopen(url)
-	return json.load(response)
+def pairwise(iterable: Iterable):
+	iterator = iter(iterable)
+	ia = next(iterator)
+
+	for ib in iterator:
+		yield ia, ib
+		ia = ib
 
 
-def osm_type_sorter(elements):
+# Area necessary to calculate mass center of a polygon with holes.
+def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord, float]:
+
+	if linear_ring[0] != linear_ring[-1]:
+		raise RuntimeError('linear ring not closed')
+
+	delta_x, delta_y = linear_ring[0]
+	reset = ((x - delta_x, y - delta_y) for x, y in linear_ring)
+
+	cx = 0.
+	cy = 0.
+	det = 0.
+
+	for (xi, yi), (xj, yj) in pairwise(reset):
+		det += (d := xi * yj - xj * yi)
+		cx += (xi + xj) * d
+		cy += (yi + yj) * d
+
+	area = det / 2
+	area_factor = 6 * area
+	center_point = (
+		cx / area_factor + delta_x,
+		cy / area_factor + delta_y
+	)
+	return center_point, abs(area)
+
+
+# Calculate mass centre of polygon
+def centroid_polygon(polygon: PolygonCoord) -> PointCoord:
+	center_point, outer_area = centroid_area_linear_ring(polygon[0])
+	if inner_rings := polygon[1:]:
+		cx = center_point[0] * outer_area
+		cy = center_point[1] * outer_area
+		area_sum = outer_area
+		for inner_ring in inner_rings:
+			inner_cp, inner_area = centroid_area_linear_ring(inner_ring)
+			cx -= center_point[0] * inner_area
+			cy -= center_point[1] * inner_area
+			area_sum -= inner_area
+		center_point = (cx / area_sum, cy / area_sum)
+	return center_point
+
+
+# Ray tracing method
+def inside_linear_ring(point: PointCoord, linear_ring: LinearRingCoord):
+
+	if linear_ring[0] != linear_ring[-1]:
+		raise RuntimeError('linear ring not closed')
+
+	px, py = point
+	inside = False
+
+	for (xi, yi), (xj, yj) in pairwise(linear_ring):
+		if (
+				((yi > py) != (yj > py)) and
+				(px < (xj - xi) * (py - yi) / (yj - yi) + xi)
+		):
+			inside = not inside
+
+	return inside
+
+
+def inside_polygon(point: PointCoord, polygon: PolygonCoord):
+	inside = inside_linear_ring(point, polygon[0])
+	if inside:
+		for inner_ring in polygon[1:]:
+			if inside_linear_ring(point, inner_ring):
+				inside = False
+	return inside
+
+
+def inside_multipolygon(point: PointCoord, multipolygon: MultipolygonCoord):
+	inside = any(inside_polygon(point, polygon) for polygon in multipolygon)
+	return inside
+
+
+def city_subdivisions_request(session: requests.Session, city_id: str):
+	params = {"data": query_template.format(city_id)}
+	response = session.get(osm_api, params=params)
+	return response.json()
+
+
+def osm_type_sorter(elements: Iterable[OsmElement]):
 	relations: Dict[int, Relation] = {}
 	ways: Dict[int, Way] = {}
 	nodes: Dict[int, Node] = {}
@@ -70,7 +201,7 @@ def osm_type_sorter(elements):
 	return nodes, ways, relations
 
 
-def connections(relation_ways: List[Way]):
+def connections(relation_ways: Iterable[Way]):
 	end_nodes = defaultdict(set)
 
 	for way in relation_ways:
@@ -148,16 +279,14 @@ def polygon_assembler(
 		if inner_way:
 			rings.extend(
 				[((node := nodes[node_id])['lon'], node['lat']) for node_id in ring]
-				for ring in linear_rings_assembler(inner_way))
+				for ring in linear_rings_assembler(inner_way)
+			)
 
 	return rings, geometry_type
 
 
-def overpass2features(
-		nodes: Dict[int, Node],
-		ways: Dict[int, Way],
-		relations: Dict[int, Relation]
-):
+def overpass2features(elements: Iterable[OsmElement]) -> Iterator[Feature]:
+	nodes, ways, relations = osm_type_sorter(elements)
 	for relation in relations.values():
 		coordinates, geometry_type = polygon_assembler(relation['members'], ways, nodes)
 		geometry = {'type': geometry_type, 'coordinates': coordinates}
@@ -165,15 +294,83 @@ def overpass2features(
 		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
 
 
-def overpass2geojson(overpass_json):
-	nodes, ways, relations = osm_type_sorter(overpass_json['elements'])
-	features = list(overpass2features(nodes, ways, relations))
+def overpass2geojson(overpass_json: OverpassResponse) -> FeatureCollection:
+	features = list(overpass2features(overpass_json['elements']))
 	return {"type": "FeatureCollection", "features": features}
 
 
-if __name__ == "__main__":
-	geojson = overpass2geojson(
-		city_subdivisions_request(cities_id[0])
+def building_center(building: Feature) -> PointCoord:
+	geometry = building['geometry']
+	geometry_type = geometry['type']
+	if geometry_type == "Polygon":
+		center = centroid_polygon(geometry['coordinates'])
+	elif geometry_type == "Point":
+		center = geometry['coordinates']
+	else:
+		raise RuntimeError(f'A building should not have geometry type {geometry_type}')
+
+	return center
+
+
+def buildings_inside_subdivision(
+		buildings: Iterable[Feature],
+		subdivision: Feature
+) -> Iterator[Feature]:
+	geometry = subdivision['geometry']
+	geometry_type = geometry['type']
+
+	if geometry_type == "Polygon":
+		inside_func = inside_polygon
+	elif geometry_type == "Multipolygon":
+		inside_func = inside_multipolygon
+	else:
+		raise RuntimeError(f'A subdivision should not have geometry type {geometry_type}')
+
+	building_centers = {b['properties']['ref:bygningsnr']: building_center(b) for b in buildings}
+
+	return filter(
+		lambda b: inside_func(building_centers[b['properties']['ref:bygningsnr']], geometry['coordinates']),
+		buildings
 	)
-	with open('oslo.geojson', 'w', encoding='utf-8') as file:
-		file.write(json.dumps(geojson, indent=2))
+
+
+def get_arguments():
+	parser = argparse.ArgumentParser()
+	parser.add_argument('input', type=str)
+	parser.add_argument('-s', '--subdivision', choices=['bydel'], default='bydel')
+	return parser.parse_args()
+
+
+def main():
+	arguments = get_arguments()
+
+	with open(arguments.input, 'r', encoding='utf-8') as file:
+		input_geojson: FeatureCollection = json.load(file)
+
+	buildings = input_geojson['features']
+
+	municipality_id = arguments.input[10:14]  # e.g. bygninger_0301_Oslo.geojson
+
+	if arguments.subdivision == 'bydel':
+		if municipality_id not in city_with_bydel_id:
+			raise RuntimeError(f'Only the municipalities with these ids have "bydeler" {city_with_bydel_id}')
+		with requests.Session() as session:
+			overpass_json = city_subdivisions_request(session, municipality_id)
+		print("Loaded bydeler from overpass api")
+		subdivisions = overpass2features(overpass_json['elements'])
+
+	else:
+		raise RuntimeError(f'subdivision {arguments.subdivision} not known')
+
+	for subdivision in subdivisions:
+		relevant_buildings = list(buildings_inside_subdivision(buildings, subdivision))
+		subdivision_name = subdivision['properties']['name']
+		filename = f'bygninger_{municipality_id}_{arguments.subdivision}_{subdivision_name}.geojson'
+		with open(filename, 'w', encoding='utf-8') as file:
+			json.dump(relevant_buildings, file, indent=2)
+
+		print(f'Saved file {filename}')
+
+
+if __name__ == "__main__":
+	main()
