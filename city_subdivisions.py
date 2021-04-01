@@ -1,6 +1,7 @@
 import requests
 import json
 import argparse
+import itertools
 from collections import defaultdict
 from typing import Tuple, List, Iterable, Iterator, TypedDict, Dict, NamedTuple, Literal, Union
 
@@ -99,12 +100,9 @@ out skel qt;
 
 
 def pairwise(iterable: Iterable):
-	iterator = iter(iterable)
-	ia = next(iterator)
-
-	for ib in iterator:
-		yield ia, ib
-		ia = ib
+	a, b = itertools.tee(iterable)
+	next(b)
+	return zip(a, b)
 
 
 # Area necessary to calculate mass center of a polygon with holes.
