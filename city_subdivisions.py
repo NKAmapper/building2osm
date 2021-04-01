@@ -79,7 +79,7 @@ class FeatureCollection(TypedDict):
 	features: List[Feature]
 
 
-city_with_bydel_id = {"0301", "1103", "4601", "5001"}
+city_with_bydel_id = {"0301", "1103", "3005", "4601", "5001"}
 osm_api = "https://overpass.kumi.systems/api/interpreter"
 query_template = """
 [out:json][timeout:40];
@@ -336,7 +336,7 @@ def buildings_inside_subdivision(
 
 def get_arguments():
 	parser = argparse.ArgumentParser()
-	parser.add_argument('input', type=str)
+	parser.add_argument('input_filename', type=str)
 	parser.add_argument('-s', '--subdivision', choices=['bydel'], default='bydel')
 	return parser.parse_args()
 
@@ -344,12 +344,13 @@ def get_arguments():
 def main():
 	arguments = get_arguments()
 
-	with open(arguments.input, 'r', encoding='utf-8') as file:
+	with open(arguments.input_filename, 'r', encoding='utf-8') as file:
 		input_geojson: FeatureCollection = json.load(file)
 
 	buildings = input_geojson['features']
 
-	municipality_id = arguments.input[10:14]  # e.g. bygninger_0301_Oslo.geojson
+	municipality_id = arguments.input_filename[10:14]  # e.g. bygninger_0301_Oslo.geojson
+	municipality_name = arguments.input_filename[15:].replace(".geojson", "")
 
 	if arguments.subdivision == 'bydel':
 		if municipality_id not in city_with_bydel_id:
@@ -364,8 +365,8 @@ def main():
 
 	for subdivision in subdivisions:
 		relevant_buildings = list(buildings_inside_subdivision(buildings, subdivision))
-		subdivision_name = subdivision['properties']['name']
-		filename = f'bygninger_{municipality_id}_{arguments.subdivision}_{subdivision_name}.geojson'
+		subdivision_name = subdivision['properties']['name'].replace(" ", "_")
+		filename = f'bygninger_{municipality_id}_{municipality_name}_{arguments.subdivision}_{subdivision_name}.geojson'
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(relevant_buildings, file, indent=2)
 
