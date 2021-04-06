@@ -1,8 +1,13 @@
 import requests
+from io import BytesIO
+from zipfile import ZipFile
 import json
 import argparse
+import itertools
 from collections import defaultdict
-from typing import Tuple, List, Iterable, Iterator, TypedDict, Dict, Literal, Union
+from typing import Tuple, List, Iterable, Iterator, Collection, Sequence, TypedDict, Dict, Literal, Union
+import utm
+from lxml import etree
 
 
 class RelationMember(TypedDict):
@@ -98,6 +103,12 @@ def pairwise(iterable: Iterable):
 	for ib in iterator:
 		yield ia, ib
 		ia = ib
+
+
+def chunk(collection: Collection, n):
+	iterator = iter(collection)
+	for _ in range(len(collection) // n):
+		yield tuple(itertools.islice(iterator, n))
 
 
 # Area necessary to calculate mass center of a polygon with holes.
@@ -213,7 +224,7 @@ def connections(relation_ways: Iterable[Way]):
 	return end_nodes
 
 
-def linear_rings_assembler(relation_ways: List[Way]):
+def linear_rings_assembler(relation_ways: Sequence[Way]) -> List[List[int]]:
 	current_way = relation_ways[0]
 
 	end_nodes = connections(relation_ways)
@@ -248,10 +259,11 @@ def linear_rings_assembler(relation_ways: List[Way]):
 
 
 def polygon_assembler(
-		members: List[RelationMember],
+		members: Iterable[RelationMember],
 		ways: Dict[int, Way],
 		nodes: Dict[int, Node]
-):
+) -> Tuple[Union[PolygonCoord, MultipolygonCoord], Literal['Polygon', 'Multipolygon']]:
+
 	outer_way = []
 	inner_way = []
 	# Python 3.10 pattern matching !
@@ -294,9 +306,8 @@ def overpass2features(elements: Iterable[OsmElement]) -> Iterator[Feature]:
 		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
 
 
-def overpass2geojson(overpass_json: OverpassResponse) -> FeatureCollection:
-	features = list(overpass2features(overpass_json['elements']))
-	return {"type": "FeatureCollection", "features": features}
+def features2geojson(features: Iterable[Feature]) -> FeatureCollection:
+	return {"type": "FeatureCollection", "features": list(features)}
 
 
 def building_center(building: Feature) -> PointCoord:
@@ -316,6 +327,7 @@ def buildings_inside_subdivision(
 		buildings: Iterable[Feature],
 		subdivision: Feature
 ) -> Iterator[Feature]:
+
 	geometry = subdivision['geometry']
 	geometry_type = geometry['type']
 
@@ -334,34 +346,186 @@ def buildings_inside_subdivision(
 	)
 
 
-def get_arguments():
+def ftp_name(name: str) -> str:
+	replacements = [(" ", "_"), ("Æ", "E"), ("Ø", "O"), ("Å", "A"), ("æ", "e"), ("ø", "o"), ("å", "a")]
+	for old, new in replacements:
+		name = name.replace(old, new)
+	return name
+
+
+def post_codes_request(
+		session: requests.Session, municipality_id: str, municipality_name: str
+) -> etree.Element:
+
+	url = (
+		'https://nedlasting.geonorge.no/geonorge/Basisdata/Postnummeromrader/GML/'
+		f'Basisdata_{municipality_id}_{ftp_name(municipality_name)}_25833_Postnummeromrader_GML.zip'
+	)
+	response = session.get(url)
+	zip_file = ZipFile(BytesIO(response.content))
+	filename = zip_file.namelist()[0]
+	with zip_file.open(filename) as gml_file:
+		tree = etree.parse(gml_file)
+	return tree.getroot()
+
+
+def utm_to_lon_lat(
+		points: Iterable[PointCoord], utm_zone: int, hemisphere: Literal['N', 'S'] = 'N'
+) -> Iterator[PointCoord]:
+
+	for point in points:
+		x, y = point
+		lat, lon = utm.UtmToLatLon(x, y, utm_zone, hemisphere)
+		yield lon, lat
+
+
+def gml_pos_list(pos_list: etree.Element) -> Iterator[PointCoord]:
+	split_text = pos_list.text.split()
+	for point in chunk(split_text, 2):
+		yield map(float, point)
+
+
+def gml_patch_assembler(gml_patch: etree.Element, ns_map, utm_zone: int) -> PolygonCoord:
+	gml_outer = gml_patch.find("./gml:exterior", ns_map)
+	pos_list = gml_outer.find(".//gml:posList", ns_map)
+	outer_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), utm_zone))
+	rings = [outer_ring]
+	if gml_inners := gml_patch.findall("./gml:interior", ns_map):
+		for gml_inner in gml_inners:
+			pos_list = gml_inner.find(".//gml:posList", ns_map)
+			inner_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), utm_zone))
+			rings.append(inner_ring)
+	return rings
+
+
+def gml_polygon_assembler(
+		gml_surface: etree.Element, ns_map
+) -> Tuple[Union[PolygonCoord, MultipolygonCoord], Literal['Polygon', 'Multipolygon']]:
+
+	utm_zone = int(gml_surface.get("srsName")[-2:])
+	patches = gml_surface.findall("./gml:patches/gml:PolygonPatch", ns_map)
+	if len(patches) == 1:
+		geometry_type = 'Polygon'
+		patch = patches[0]
+		coordinates = gml_patch_assembler(patch, ns_map, utm_zone)
+	else:
+		geometry_type = 'Multipolygon'
+		coordinates = [gml_patch_assembler(patch, ns_map, utm_zone) for patch in patches]
+
+	return coordinates, geometry_type
+
+
+def postcodes2features(gml_feature_collection: etree.Element) -> Iterator[Feature]:
+	nsmap = gml_feature_collection.nsmap
+	gml_features = gml_feature_collection.iterfind("./gml:featureMember", nsmap)
+	postcode_filter = filter(lambda f: f.find('./app:Postnummerområde', nsmap) is not None,  gml_features)
+
+	for gml_feature in postcode_filter:
+		surface = gml_feature.find('.//gml:Surface', nsmap)
+		coordinates, geometry_type = gml_polygon_assembler(surface, nsmap)
+		geometry = {'type': geometry_type, 'coordinates': coordinates}
+		postcode = gml_feature.find('.//app:postnummer', nsmap).text
+		postal_place = gml_feature.find('.//app:poststed', nsmap).text
+		postal_place = postal_place[0] + postal_place[1:].lower()
+		properties = {'name': f"{postcode} {postal_place}", 'postcode': postcode, 'postal place': postal_place}
+		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
+
+
+def load_municipalities(session: requests.Session) -> Dict[str, str]:
+	url = "https://ws.geonorge.no/kommuneinfo/v1/fylkerkommuner"
+	params = {"filtrer": ','.join(("fylkesnummer", "fylkesnavn", "kommuner.kommunenummer", "kommuner.kommunenavnNorsk"))}
+	response = session.get(url, params=params)
+	data = response.json()
+
+	municipalities = {}
+
+	for county in data:
+		for municipality in county['kommuner']:
+			municipalities[municipality['kommunenummer']] = municipality['kommunenavnNorsk']
+
+	return municipalities
+
+
+def get_municipality(parameter: str, municipalities: Dict[str, str]):
+	if ".geojson" in parameter:
+		municipality_id = parameter[10:14]  # e.g. bygninger_0301_Oslo.geojson
+		municipality_name = municipalities[municipality_id]
+		filename = parameter
+
+	else:
+		if parameter.isdigit():
+			municipality_id = parameter
+
+		else:
+			duplicate = False
+			found_id = None
+			for mun_id, mun_name in municipalities.items():
+				if parameter.lower() == mun_name.lower():
+					found_id = mun_id
+					duplicate = False
+					break
+				elif parameter.lower() in mun_name.lower():
+					if found_id:
+						duplicate = True
+					else:
+						found_id = mun_id
+
+			if found_id and not duplicate:
+				municipality_id = found_id
+			else:
+				raise RuntimeError(f'Could not parse {parameter} as filename, municipality id or name')
+
+		municipality_name = municipalities[municipality_id]
+		filename = f'bygninger_{municipality_id:4}_{municipality_name}.geojson'
+
+	return municipality_id, municipality_name, filename
+
+
+def get_arguments() -> argparse.Namespace:
 	parser = argparse.ArgumentParser()
-	parser.add_argument('input_filename', type=str)
-	parser.add_argument('-s', '--subdivision', choices=['bydel'], default='bydel')
+	parser.add_argument('input', help="municipality name, kode or filename from building2osm")
+	parser.add_argument('-s', '--subdivision', choices=['bydeler', 'postnummer'])
+	parser.add_argument('-a', dest='save_area', action='store_true', help="saves areas as geojson",)
 	return parser.parse_args()
 
 
 def main():
 	arguments = get_arguments()
 
-	with open(arguments.input_filename, 'r', encoding='utf-8') as file:
+	session = requests.Session()
+	municipalities = load_municipalities(session)
+	municipality_id, municipality_name, filename = get_municipality(arguments.input, municipalities)
+
+	with open(filename, 'r', encoding='utf-8') as file:
 		input_geojson: FeatureCollection = json.load(file)
 
 	buildings = input_geojson['features']
 
-	municipality_id = arguments.input_filename[10:14]  # e.g. bygninger_0301_Oslo.geojson
-	municipality_name = arguments.input_filename[15:].replace(".geojson", "")
+	if not arguments.subdivision:
+		arguments.subdivision = 'bydeler' if municipality_id in city_with_bydel_id else 'postnummer'
 
-	if arguments.subdivision == 'bydel':
+	if arguments.subdivision == 'bydeler':
 		if municipality_id not in city_with_bydel_id:
 			raise RuntimeError(f'Only the municipalities with these ids have "bydeler" {city_with_bydel_id}')
-		with requests.Session() as session:
-			overpass_json = city_subdivisions_request(session, municipality_id)
+		overpass_json = city_subdivisions_request(session, municipality_id)
 		print("Loaded bydeler from overpass api")
 		subdivisions = overpass2features(overpass_json['elements'])
 
+	elif arguments.subdivision == 'postnummer':
+		xml_root = post_codes_request(session, municipality_id, municipality_name)
+		subdivisions = postcodes2features(xml_root)
+		print("Loaded postal codes")
+
 	else:
 		raise RuntimeError(f'subdivision {arguments.subdivision} not known')
+
+	if arguments.save_area:
+		subdivisions = list(subdivisions)
+		geojson = features2geojson(subdivisions)
+		filename = f'{arguments.subdivision}_{municipality_id}_{municipality_name}.geojson'
+		with open(filename, 'w', encoding='utf-8') as file:
+			json.dump(geojson, file, indent=2)
+		print(f'Saved file "{filename}"')
 
 	for subdivision in subdivisions:
 		relevant_buildings = list(buildings_inside_subdivision(buildings, subdivision))
@@ -370,7 +534,7 @@ def main():
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(relevant_buildings, file, indent=2)
 
-		print(f'Saved file {filename}')
+		print(f'Saved file "{filename}"')
 
 
 if __name__ == "__main__":
