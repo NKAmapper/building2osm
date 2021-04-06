@@ -5,7 +5,7 @@ import json
 import argparse
 import itertools
 from collections import defaultdict
-from typing import Tuple, List, Iterable, Iterator, Collection, Sequence, TypedDict, Dict, Literal, Union
+from typing import Tuple, List, Iterable, Iterator, Collection, Sequence, TypedDict, Dict, NamedTuple, Literal, Union
 import utm
 from lxml import etree
 
@@ -84,6 +84,13 @@ class FeatureCollection(TypedDict):
 	features: List[Feature]
 
 
+class Bbox(NamedTuple):
+	minlat: float
+	minlon: float
+	maxlat: float
+	maxlon: float
+
+
 city_with_bydel_id = {"0301", "1103", "3005", "4601", "5001"}
 osm_api = "https://overpass.kumi.systems/api/interpreter"
 query_template = """
@@ -97,12 +104,9 @@ out skel qt;
 
 
 def pairwise(iterable: Iterable):
-	iterator = iter(iterable)
-	ia = next(iterator)
-
-	for ib in iterator:
-		yield ia, ib
-		ia = ib
+	a, b = itertools.tee(iterable)
+	next(b)
+	return zip(a, b)
 
 
 def chunk(collection: Collection, n):
@@ -154,6 +158,25 @@ def centroid_polygon(polygon: PolygonCoord) -> PointCoord:
 	return center_point
 
 
+def point_inside_bbox(point: PointCoord, bbox: Bbox):
+	p_lon, p_lat = point
+	return bbox.minlat <= p_lat <= bbox.maxlat and bbox.minlon <= p_lon <= bbox.maxlon
+
+
+def bbox_for_polygon(polygon: PolygonCoord) -> Bbox:
+	outer_ring = polygon[0]
+	return Bbox(
+		min(p[1] for p in outer_ring),
+		min(p[0] for p in outer_ring),
+		max(p[1] for p in outer_ring),
+		max(p[0] for p in outer_ring)
+	)
+
+
+def bboxes_for_multipolygon(multipolygon: MultipolygonCoord) -> List[Bbox]:
+	return [bbox_for_polygon(polygon) for polygon in multipolygon]
+
+
 # Ray tracing method
 def inside_linear_ring(point: PointCoord, linear_ring: LinearRingCoord):
 
@@ -173,7 +196,11 @@ def inside_linear_ring(point: PointCoord, linear_ring: LinearRingCoord):
 	return inside
 
 
-def inside_polygon(point: PointCoord, polygon: PolygonCoord):
+def inside_polygon(point: PointCoord, polygon: PolygonCoord, bbox: Bbox = None):
+	bbox = bbox if bbox else bbox_for_polygon(polygon)
+	if not point_inside_bbox(point, bbox):
+		return False
+
 	inside = inside_linear_ring(point, polygon[0])
 	if inside:
 		for inner_ring in polygon[1:]:
@@ -182,8 +209,12 @@ def inside_polygon(point: PointCoord, polygon: PolygonCoord):
 	return inside
 
 
-def inside_multipolygon(point: PointCoord, multipolygon: MultipolygonCoord):
-	inside = any(inside_polygon(point, polygon) for polygon in multipolygon)
+def inside_multipolygon(point: PointCoord, multipolygon: MultipolygonCoord, bboxes: List[Bbox] = None):
+	bboxes = bboxes if bboxes else bboxes_for_multipolygon(multipolygon)
+	if not any(point_inside_bbox(point, bbox) for bbox in bboxes):
+		return False
+
+	inside = any(inside_polygon(point, polygon, bbox) for polygon, bbox in zip(multipolygon, bboxes))
 	return inside
 
 
@@ -330,18 +361,21 @@ def buildings_inside_subdivision(
 
 	geometry = subdivision['geometry']
 	geometry_type = geometry['type']
+	coordinates = geometry['coordinates']
 
 	if geometry_type == "Polygon":
 		inside_func = inside_polygon
+		bbox = bbox_for_polygon(coordinates)
 	elif geometry_type == "Multipolygon":
 		inside_func = inside_multipolygon
+		bbox = bboxes_for_multipolygon(coordinates)
 	else:
 		raise RuntimeError(f'A subdivision should not have geometry type {geometry_type}')
 
 	building_centers = {b['properties']['ref:bygningsnr']: building_center(b) for b in buildings}
 
 	return filter(
-		lambda b: inside_func(building_centers[b['properties']['ref:bygningsnr']], geometry['coordinates']),
+		lambda b: inside_func(building_centers[b['properties']['ref:bygningsnr']], coordinates, bbox),
 		buildings
 	)
 
