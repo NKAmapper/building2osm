@@ -473,7 +473,7 @@ def get_municipality(parameter: str, municipalities: Dict[str, str]):
 			if found_id and not duplicate:
 				municipality_id = found_id
 			else:
-				raise RuntimeError(f'Could not parse {parameter} as filename, municipality id or name')
+				raise RuntimeError(f'Municipality {parameter} not found, or ambiguous')
 
 		municipality_name = municipalities[municipality_id]
 		filename = f'bygninger_{municipality_id:4}_{municipality_name}.geojson'
