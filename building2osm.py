@@ -1478,4 +1478,4 @@ if __name__ == '__main__':
 
 	if "-split" in sys.argv:
 		message("Start splitting...\n\n")
-		subprocess.run(['python', "city_subdivisions.py", municipality_id])
+		subprocess.run(['python', "municipality_split.py", municipality_id])

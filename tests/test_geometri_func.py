@@ -1,4 +1,4 @@
-from city_subdivisions import inside_polygon, centroid_polygon
+from municipality_split import inside_polygon, centroid_polygon
 
 
 def test_inside_polygon_clockwise():
