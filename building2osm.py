@@ -1476,6 +1476,6 @@ if __name__ == '__main__':
 	else:
 		process_municipality(municipality_id, municipalities[ municipality_id ])
 
-	if "-s" or "--split" in sys.argv:
+	if "-split" in sys.argv:
 		message("Start splitting...\n\n")
 		subprocess.run(['python', "city_subdivisions.py", municipality_id])

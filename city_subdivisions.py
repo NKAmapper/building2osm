@@ -518,8 +518,8 @@ def get_municipality(parameter: str, municipalities: Dict[str, str]):
 def get_arguments() -> argparse.Namespace:
 	parser = argparse.ArgumentParser()
 	parser.add_argument('input', help="municipality name, kode or filename from building2osm")
-	parser.add_argument('-s', '--subdivision', choices=['bydeler', 'postnummer'])
-	parser.add_argument('-a', dest='save_area', action='store_true', help="saves areas as geojson",)
+	parser.add_argument('-s', '--subdivision', choices=['bydel', 'postnummer'])
+	parser.add_argument('-a', '--area', dest='save_area', action='store_true', help="saves areas as geojson",)
 	return parser.parse_args()
 
 
@@ -535,17 +535,21 @@ def main():
 
 	buildings = input_geojson['features']
 
-	if not arguments.subdivision:
-		arguments.subdivision = 'bydeler' if municipality_id in city_with_bydel_id else 'postnummer'
+	print(f'Loaded {len(buildings)} buildings from "{filename}"\n')
 
-	if arguments.subdivision == 'bydeler':
+	if not arguments.subdivision:
+		arguments.subdivision = 'bydel' if municipality_id in city_with_bydel_id else 'postnummer'
+
+	if arguments.subdivision == 'bydel':
 		if municipality_id not in city_with_bydel_id:
 			raise RuntimeError(f'Only the municipalities with these ids have "bydeler" {city_with_bydel_id}')
+		subdivision_plural = 'bydeler'
 		overpass_json = city_subdivisions_request(session, municipality_id)
-		print("Loaded bydeler from overpass api")
+		print(f"Loaded {subdivision_plural} from overpass api")
 		subdivisions = overpass2features(overpass_json['elements'])
 
 	elif arguments.subdivision == 'postnummer':
+		subdivision_plural = 'postnummere'
 		xml_root = post_codes_request(session, municipality_id, municipality_name)
 		subdivisions = postcodes2features(xml_root)
 		print("Loaded postal codes")
@@ -556,19 +560,29 @@ def main():
 	if arguments.save_area:
 		subdivisions = list(subdivisions)
 		geojson = features2geojson(subdivisions)
-		filename = f'{arguments.subdivision}_{municipality_id}_{municipality_name}.geojson'
+		filename = f'{subdivision_plural}_{municipality_id}_{municipality_name}.geojson'
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2)
-		print(f'Saved file "{filename}"')
+		print(f'\tSaved area to "{filename}"')
+
+	print("")
 
 	for subdivision in subdivisions:
-		relevant_buildings = list(buildings_inside_subdivision(buildings, subdivision))
-		subdivision_name = subdivision['properties']['name'].replace(" ", "_")
-		filename = f'bygninger_{municipality_id}_{municipality_name}_{arguments.subdivision}_{subdivision_name}.geojson'
-		with open(filename, 'w', encoding='utf-8') as file:
-			json.dump(relevant_buildings, file, indent=2)
+		relevant_buildings = buildings_inside_subdivision(buildings, subdivision)
+		geojson = features2geojson(relevant_buildings)
+		subdivision_name = subdivision['properties']['name']
 
-		print(f'Saved file "{filename}"')
+		print(f"{arguments.subdivision.title()} {subdivision_name}:")
+		print(f"\t{len(geojson['features']):6d} buildings with centroid inside area.")
+
+		filename = (
+			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
+			f'{arguments.subdivision}_{subdivision_name.replace(" ", "_")}.geojson'
+		)
+		with open(filename, 'w', encoding='utf-8') as file:
+			json.dump(geojson, file, indent=2)
+
+		print(f'\tSaved to "{filename}"')
 
 
 if __name__ == "__main__":
