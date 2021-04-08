@@ -296,7 +296,7 @@ def polygon_assembler(
 		members: Iterable[RelationMember],
 		ways: Dict[int, Way],
 		nodes: Dict[int, Node]
-) -> Tuple[Union[PolygonCoord, MultipolygonCoord], Literal['Polygon', 'Multipolygon']]:
+) -> Union[PolygonGeometry, MultipolygonGeometry]:
 
 	outer_way = []
 	inner_way = []
@@ -311,31 +311,30 @@ def polygon_assembler(
 		way = ways[member['ref']]
 		switch[member['role']].append(way)
 
-	rings = [
+	coordinates = [
 		[((node := nodes[node_id])['lon'], node['lat']) for node_id in ring]
 		for ring in linear_rings_assembler(outer_way)
 	]
-	if len(rings) > 1:
+	if len(coordinates) > 1:
 		geometry_type = "Multipolygon"
-		rings = [[ring] for ring in rings]
+		coordinates = [[ring] for ring in coordinates]
 		if inner_way:
 			raise NotImplementedError("Simple feature multipolygons with inner ways not implemented yet")
 	else:
 		geometry_type = "Polygon"
 		if inner_way:
-			rings.extend(
+			coordinates.extend(
 				[((node := nodes[node_id])['lon'], node['lat']) for node_id in ring]
 				for ring in linear_rings_assembler(inner_way)
 			)
 
-	return rings, geometry_type
+	return {'type': geometry_type, 'coordinates': coordinates}
 
 
 def overpass2features(elements: Iterable[OsmElement]) -> Iterator[Feature]:
 	nodes, ways, relations = osm_type_sorter(elements)
 	for relation in relations.values():
-		coordinates, geometry_type = polygon_assembler(relation['members'], ways, nodes)
-		geometry = {'type': geometry_type, 'coordinates': coordinates}
+		geometry = polygon_assembler(relation['members'], ways, nodes)
 		properties = relation['tags']
 		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
 
