@@ -7,7 +7,10 @@ import itertools
 from collections import defaultdict
 from typing import Tuple, List, Iterable, Iterator, Collection, Sequence, TypedDict, Dict, NamedTuple, Literal, Union
 import utm
-from lxml import etree
+try:
+	from lxml import etree
+except ImportError:
+	import xml.etree.ElementTree as etree
 
 
 class RelationMember(TypedDict):
@@ -419,47 +422,49 @@ def gml_pos_list(pos_list: etree.Element) -> Iterator[PointCoord]:
 		yield map(float, point)
 
 
-def gml_patch_assembler(gml_patch: etree.Element, ns_map, utm_zone: int) -> PolygonCoord:
-	gml_outer = gml_patch.find("./gml:exterior", ns_map)
-	pos_list = gml_outer.find(".//gml:posList", ns_map)
+def gml_patch_assembler(gml_patch: etree.Element, namespace, utm_zone: int) -> PolygonCoord:
+	gml_outer = gml_patch.find("./gml:exterior", namespace)
+	pos_list = gml_outer.find(".//gml:posList", namespace)
 	outer_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), utm_zone))
 	rings = [outer_ring]
-	if gml_inners := gml_patch.findall("./gml:interior", ns_map):
+	if gml_inners := gml_patch.findall("./gml:interior", namespace):
 		for gml_inner in gml_inners:
-			pos_list = gml_inner.find(".//gml:posList", ns_map)
+			pos_list = gml_inner.find(".//gml:posList", namespace)
 			inner_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), utm_zone))
 			rings.append(inner_ring)
 	return rings
 
 
 def gml_polygon_assembler(
-		gml_surface: etree.Element, ns_map
-) -> Tuple[Union[PolygonCoord, MultipolygonCoord], Literal['Polygon', 'Multipolygon']]:
+		gml_surface: etree.Element, namespace
+) -> Union[PolygonGeometry, MultipolygonGeometry]:
 
 	utm_zone = int(gml_surface.get("srsName")[-2:])
-	patches = gml_surface.findall("./gml:patches/gml:PolygonPatch", ns_map)
+	patches = gml_surface.findall("./gml:patches/gml:PolygonPatch", namespace)
 	if len(patches) == 1:
 		geometry_type = 'Polygon'
 		patch = patches[0]
-		coordinates = gml_patch_assembler(patch, ns_map, utm_zone)
+		coordinates = gml_patch_assembler(patch, namespace, utm_zone)
 	else:
 		geometry_type = 'Multipolygon'
-		coordinates = [gml_patch_assembler(patch, ns_map, utm_zone) for patch in patches]
+		coordinates = [gml_patch_assembler(patch, namespace, utm_zone) for patch in patches]
 
-	return coordinates, geometry_type
+	return {'type': geometry_type, 'coordinates': coordinates}
 
 
 def postcodes2features(gml_feature_collection: etree.Element) -> Iterator[Feature]:
-	nsmap = gml_feature_collection.nsmap
-	gml_features = gml_feature_collection.iterfind("./gml:featureMember", nsmap)
-	postcode_filter = filter(lambda f: f.find('./app:Postnummerområde', nsmap) is not None,  gml_features)
+	namespace = {
+		"gml": "http://www.opengis.net/gml/3.2",
+		"app": "http://skjema.geonorge.no/SOSI/produktspesifikasjon/Postnummeromrader/20180215"
+	}
+	gml_features = gml_feature_collection.iterfind("./gml:featureMember", namespace)
+	postcode_filter = filter(lambda f: f.find('./app:Postnummerområde', namespace) is not None,  gml_features)
 
 	for gml_feature in postcode_filter:
-		surface = gml_feature.find('.//gml:Surface', nsmap)
-		coordinates, geometry_type = gml_polygon_assembler(surface, nsmap)
-		geometry = {'type': geometry_type, 'coordinates': coordinates}
-		postcode = gml_feature.find('.//app:postnummer', nsmap).text
-		postal_place = gml_feature.find('.//app:poststed', nsmap).text
+		surface = gml_feature.find('.//gml:Surface', namespace)
+		geometry = gml_polygon_assembler(surface, namespace)
+		postcode = gml_feature.find('.//app:postnummer', namespace).text
+		postal_place = gml_feature.find('.//app:poststed', namespace).text
 		postal_place = postal_place[0] + postal_place[1:].lower()
 		properties = {'name': f"{postcode} {postal_place}", 'postcode': postcode, 'postal place': postal_place}
 		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
