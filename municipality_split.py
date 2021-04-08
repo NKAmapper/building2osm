@@ -539,7 +539,7 @@ def main():
 
 	buildings = input_geojson['features']
 
-	print(f'Loaded {len(buildings)} buildings from "{filename}"\n')
+	print(f'\nLoaded {len(buildings)} buildings from "{filename}"\n')
 
 	if not arguments.subdivision:
 		arguments.subdivision = 'bydel' if municipality_id in city_with_bydel_id else 'postnummer'
@@ -569,15 +569,12 @@ def main():
 			json.dump(geojson, file, indent=2)
 		print(f'\tSaved area to "{filename}"')
 
-	print("")
+	print(f'\nSplitting municipality into {subdivision_plural}')
 
 	for subdivision in subdivisions:
 		relevant_buildings = buildings_inside_subdivision(buildings, subdivision)
 		geojson = features2geojson(relevant_buildings)
 		subdivision_name = subdivision['properties']['name']
-
-		print(f"{arguments.subdivision.title()} {subdivision_name}:")
-		print(f"\t{len(geojson['features']):6d} buildings with centroid inside area.")
 
 		filename = (
 			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
@@ -586,8 +583,10 @@ def main():
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2)
 
-		print(f'\tSaved to "{filename}"')
+		print(f"\tSaved {len(geojson['features'])} buildings to '{filename}'")
+		      
+	print("")
 
-
+		      
 if __name__ == "__main__":
 	main()
