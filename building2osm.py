@@ -16,6 +16,7 @@ import csv
 import json
 import urllib.request
 import zipfile
+import subprocess
 from io import TextIOWrapper
 from io import BytesIO
 from xml.etree import ElementTree as ET
@@ -1474,3 +1475,7 @@ if __name__ == '__main__':
 			message ("*** Failed runs: %s\n\n" % (", ".join(failed_runs)))
 	else:
 		process_municipality(municipality_id, municipalities[ municipality_id ])
+
+	if "-split" in sys.argv:
+		message("Start splitting...\n\n")
+		subprocess.run(['python', "municipality_split.py", municipality_id])

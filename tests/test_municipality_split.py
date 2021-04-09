@@ -1,4 +1,4 @@
-from city_subdivisions import linear_rings_assembler, polygon_assembler, buildings_inside_subdivision
+from municipality_split import linear_rings_assembler, polygon_assembler, buildings_inside_subdivision
 
 relation_ways = [
 	{"id": 500, "nodes": [1, 2, 3]},
@@ -38,7 +38,7 @@ building = {
 			(10.8157071, 59.9071979), (10.8157184, 59.9071819), (10.8157184, 59.9071819),
 			(10.8157456, 59.9070814)
 		]]},
-	"center": (10.8158335, 59.9071575)
+	'properties': {'ref:bygningsnr': '123'},
 }
 buildings = [building]
 
@@ -49,19 +49,22 @@ def test_ring():
 
 
 def test_polygon():
-	expected = ([[
-		(10.7183, 59.8111), (10.8364, 59.8340), (10.9067, 59.8791),
-		(10.8977, 59.9394), (10.8439, 59.9769), (10.7317, 59.9929),
-		(10.5994, 59.9754), (10.5956, 59.8596), (10.7183, 59.8111)
-	]], "Polygon")
+	expected = {
+		"type": "Polygon",
+		"coordinates": [[
+			(10.7183, 59.8111), (10.8364, 59.8340), (10.9067, 59.8791),
+			(10.8977, 59.9394), (10.8439, 59.9769), (10.7317, 59.9929),
+			(10.5994, 59.9754), (10.5956, 59.8596), (10.7183, 59.8111)
+		]]
+	}
 
 	assert polygon_assembler(relation_members, test_ways, test_nodes) == expected
 
 
 def test_buildings_inside_polygon():
-	coordinates, geometry_type = polygon_assembler(relation_members, test_ways, test_nodes)
+	geometry = polygon_assembler(relation_members, test_ways, test_nodes)
 	subdivision = {
 		'type': 'Feature',
-		'geometry': {'type': geometry_type, 'coordinates': coordinates}
+		'geometry': geometry
 	}
 	assert buildings_inside_subdivision(buildings, subdivision)
