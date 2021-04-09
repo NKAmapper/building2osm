@@ -6,10 +6,11 @@ Generates import files for OpenStreetMap with buliding footprints from Kartverke
 Generates geojson import file with building footprints.
 
 Usage:
-<code>python3 building2osm.py \<municipality\> [-original] [-verify] [-debug]</code>
+<code>python3 building2osm.py \<municipality\> [-split] [-original] [-verify] [-debug]</code>
 
 Parameters:
 * _municipality_ - Name of the municipality to generate.
+* <code>-split</code> - Also split output file into smaller subdivisions ("bydel" or post districts).
 * <code>-original</code> - Produce file without any modifications.
 * <code>-verify</code> - Include extra tags for verification of topology modificatons.
 * <code>-debug</code> - Include extra tags for debugging.
@@ -26,6 +27,16 @@ Parameters:
 * _max distance_ - Optional maximum Hausdorff distance between matched buildings. Default value is 10 metres (5 metres is the building is tagged).
 * _filename.geojson_ - Optional input file in geojson format. If not specified, the import file for the municipality will be loaded (it must be present in the default folder).
 * <code>-debug</code> - Include extra tags for debugging.
+
+### municipality_split
+
+Splits the geojson import file into smaller subdivisions such as post districts or "bydel".
+
+Usage:
+<code>python3 municipality_split.py \<municipality\> [ --subdivision [ bydel | postnummer ]</code>
+ 
+Parameter:
+* _municipality_ - Name of the municipality to split.
 
 ### Notes
 * Source data is from the Cadastral registry of Kartverket
