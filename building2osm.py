@@ -23,7 +23,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.5.1"
+version = "0.6.0"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -1476,6 +1476,6 @@ if __name__ == '__main__':
 	else:
 		process_municipality(municipality_id, municipalities[ municipality_id ])
 
-	if "-split" in sys.argv:
-		message("Start splitting...\n\n")
-		subprocess.run(['python', "municipality_split.py", municipality_id])
+		if "-split" in sys.argv:
+			message("Start splitting...\n\n")
+			subprocess.run(['python', "municipality_split.py", municipality_id])
