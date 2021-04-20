@@ -566,7 +566,7 @@ def main():
 		geojson = features2geojson(subdivisions)
 		filename = f'{subdivision_plural}_{municipality_id}_{municipality_name}.geojson'
 		with open(filename, 'w', encoding='utf-8') as file:
-			json.dump(geojson, file, indent=2)
+			json.dump(geojson, file, indent=2, ensure_ascii=False)
 		print(f'\tSaved area to "{filename}"')
 
 	print(f'\nSplitting municipality into {subdivision_plural}')
@@ -581,7 +581,7 @@ def main():
 			f'{arguments.subdivision}_{subdivision_name.replace(" ", "_")}.geojson'
 		)
 		with open(filename, 'w', encoding='utf-8') as file:
-			json.dump(geojson, file, indent=2)
+			json.dump(geojson, file, indent=2, ensure_ascii=False)
 
 		print(f"\tSaved {len(geojson['features'])} buildings to '{filename}'")
 		      
