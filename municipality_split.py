@@ -99,13 +99,13 @@ class FeatureCollection(TypedDict):
 
 
 class Bbox(NamedTuple):
-    minlat: float
-    minlon: float
-    maxlat: float
-    maxlon: float
+    min_lat: float
+    min_lon: float
+    max_lat: float
+    max_lon: float
 
 
-city_with_bydel_id = {"0301", "1103", "3005", "4601", "5001"}
+city_with_quarter_id = {"0301", "1103", "3005", "4601", "5001"}
 osm_api = "https://overpass.kumi.systems/api/interpreter"
 query_template = """
 [out:json][timeout:40];
@@ -170,7 +170,7 @@ def centroid_polygon(polygon: PolygonCoord) -> PointCoord:
 
 def point_inside_bbox(point: PointCoord, bbox: Bbox):
     p_lon, p_lat = point
-    return bbox.minlat <= p_lat <= bbox.maxlat and bbox.minlon <= p_lon <= bbox.maxlon
+    return bbox.min_lat <= p_lat <= bbox.max_lat and bbox.min_lon <= p_lon <= bbox.max_lon
 
 
 def bbox_for_polygon(polygon: PolygonCoord) -> Bbox:
@@ -243,9 +243,9 @@ def osm_type_sorter(elements: Iterable[OsmElement]):
     switch = {"relation": relations, "way": ways, "node": nodes}
 
     for element in elements:
-        osmtype = element["type"]
-        osmid = element["id"]
-        switch[osmtype][osmid] = element
+        osm_type = element["type"]
+        osm_id = element["id"]
+        switch[osm_type][osm_id] = element
 
     return nodes, ways, relations
 
@@ -594,13 +594,13 @@ def main():
 
     if not arguments.subdivision:
         arguments.subdivision = (
-            "bydel" if municipality_id in city_with_bydel_id else "postnummer"
+            "bydel" if municipality_id in city_with_quarter_id else "postnummer"
         )
 
     if arguments.subdivision == "bydel":
-        if municipality_id not in city_with_bydel_id:
+        if municipality_id not in city_with_quarter_id:
             raise RuntimeError(
-                f'Only the municipalities with these ids have "bydeler" {city_with_bydel_id}'
+                f'Only the municipalities with these ids have quarters ("bydeler") {city_with_quarter_id}'
             )
         subdivision_plural = "bydeler"
         overpass_json = city_subdivisions_request(session, municipality_id)

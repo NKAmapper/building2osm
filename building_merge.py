@@ -21,7 +21,7 @@ request_header = {"User-Agent": "building2osm/" + version}
 
 osm_api = "https://api.openstreetmap.org/api/0.6/"  # Production database
 
-margin_haus = 10.0  # Maximum deviation between polygons (meters)
+margin_hausdorff = 10.0  # Maximum deviation between polygons (meters)
 margin_tagged = 5.0  # Maximum deviation between polygons if building is tagged (meters)
 margin_area = 0.5  # Max 50% difference of building areas
 
@@ -53,7 +53,7 @@ def message(text):
     sys.stderr.flush()
 
 
-def timeformat(sec):
+def format_time(sec):
     """Format time"""
     if sec > 3600:
         return "%i:%02i:%02i hours" % (sec / 3600, (sec % 3600) / 60, sec % 60)
@@ -94,12 +94,12 @@ def distance2(point1, point2):
         math.radians, [point1[0], point1[1], point2[0], point2[1]]
     )
 
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
+    d_lon = lon2 - lon1
+    d_lat = lat2 - lat1
 
     a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        math.sin(d_lat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
@@ -260,56 +260,56 @@ def hausdorff_distance(p1, p2):
     N1 = len(p1) - 1
     N2 = len(p2) - 1
 
-    # Shuffling for small lists disbabled
+    # Shuffling for small lists disabled
     # 	random.shuffle(p1)
     # 	random.shuffle(p2)
 
-    cmax = 0
+    c_max = 0
     for i in range(N1):
         no_break = True
-        cmin = 999999.9  # Dummy
+        c_min = 999999.9  # Dummy
 
         for j in range(N2):
 
             d = line_distance(p2[j], p2[j + 1], p1[i])
 
-            if d < cmax:
+            if d < c_max:
                 no_break = False
                 break
 
-            if d < cmin:
-                cmin = d
+            if d < c_min:
+                c_min = d
 
-        if cmin < 999999.9 and cmin > cmax and no_break:
-            cmax = cmin
+        if c_min < 999999.9 and c_min > c_max and no_break:
+            c_max = c_min
 
-    # 	return cmax
+    # 	return c_max
 
     for i in range(N2):
         no_break = True
-        cmin = 999999.9  # Dummy
+        c_min = 999999.9  # Dummy
 
         for j in range(N1):
 
             d = line_distance(p1[j], p1[j + 1], p2[i])
 
-            if d < cmax:
+            if d < c_max:
                 no_break = False
                 break
 
-            if d < cmin:
-                cmin = d
+            if d < c_min:
+                c_min = d
 
-        if cmin < 999999.9 and cmin > cmax and no_break:
-            cmax = cmin
+        if c_min < 999999.9 and c_min > c_max and no_break:
+            c_max = c_min
 
-    return cmax
+    return c_max
 
 
 def get_municipality(parameter):
     """Identify municipality name, unless more than one hit
 
-    Returns municipality number, or input paramter if not found
+    Returns municipality number, or input parameter if not found
     """
     if parameter.isdigit():
         return parameter
@@ -346,19 +346,19 @@ def load_municipalities():
             ]
 
 
-def load_import_buildings(filename):
+def load_import_buildings(file_name):
     """Load buildings from geojson file"""
     global import_buildings
 
     message("Loading import buildings ...\n")
-    message("\tFilename '%s'\n" % filename)
+    message("\tFilename '%s'\n" % file_name)
 
-    file = open(filename)
+    file = open(file_name)
     data = json.load(file)
     file.close()
     import_buildings = data["features"]
 
-    # Add centeroid and area
+    # Add centroid and area
     for building in import_buildings:
         if (
             building["geometry"]["type"] == "Polygon"
@@ -636,10 +636,10 @@ def reverse_match(import_building):
     best_diff = 9999  # Dummy
 
     min_bbox = coordinate_offset(
-        import_building["center"], -2 * margin_haus
+        import_building["center"], -2 * margin_hausdorff
     )  # import_building['area'])
     max_bbox = coordinate_offset(
-        import_building["center"], +2 * margin_haus
+        import_building["center"], +2 * margin_hausdorff
     )  # import_building['area'])
 
     for osm_building in osm_buildings:
@@ -650,13 +650,13 @@ def reverse_match(import_building):
             and min_bbox[1] < osm_building["center"][1] < max_bbox[1]
         ):  # and "action" not in osm_building and \
 
-            diff_haus = hausdorff_distance(
+            diff_hausdorff = hausdorff_distance(
                 import_building["geometry"]["coordinates"][0], osm_building["polygon"]
             )
 
-            if diff_haus < best_diff:
+            if diff_hausdorff < best_diff:
                 found_building = osm_building
-                best_diff = diff_haus
+                best_diff = diff_hausdorff
 
     return (found_building, best_diff)
 
@@ -666,7 +666,7 @@ def merge_buildings():
     message("Merging buildings ...\n")
     message(
         "\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n"
-        % (margin_haus, margin_tagged)
+        % (margin_hausdorff, margin_tagged)
     )
     message("\tMaximum area difference: %i %%\n" % (margin_area * 100))
 
@@ -682,10 +682,10 @@ def merge_buildings():
         # Get bbox for limiting search below
 
         min_bbox = coordinate_offset(
-            osm_building["center"], -2 * margin_haus
+            osm_building["center"], -2 * margin_hausdorff
         )  # osm_building['area'])
         max_bbox = coordinate_offset(
-            osm_building["center"], +2 * margin_haus
+            osm_building["center"], +2 * margin_hausdorff
         )  # osm_building['area'])
 
         for import_building in import_buildings:
@@ -697,14 +697,14 @@ def merge_buildings():
             ):
 
                 # Calculate Hausdorff distance to identify building with shortest distance
-                diff_haus = hausdorff_distance(
+                diff_hausdorff = hausdorff_distance(
                     osm_building["polygon"],
                     import_building["geometry"]["coordinates"][0],
                 )
 
-                if diff_haus < best_diff:
+                if diff_hausdorff < best_diff:
                     found_building = import_building
-                    best_diff = diff_haus
+                    best_diff = diff_hausdorff
 
         if found_building is not None:
             if debug:
@@ -712,15 +712,15 @@ def merge_buildings():
 
             # Also check if Hausdorff distance is within given limit (shorter limit for tagged buildings)
             if (
-                best_diff < margin_haus
+                best_diff < margin_hausdorff
                 and "tagged" not in osm_building
                 or best_diff < margin_tagged
             ):
 
                 # Also check if both buildings are each others best match
-                found_reverse, reverse_haus = reverse_match(found_building)
+                found_reverse, reverse_hausdorff = reverse_match(found_building)
 
-                if found_reverse == osm_building and reverse_haus < margin_haus:
+                if found_reverse == osm_building and reverse_hausdorff < margin_hausdorff:
 
                     # Buildings
                     if (
@@ -781,17 +781,17 @@ def set_attributes(element, data):
         element.set("visible", "true")
 
 
-def save_file(filename):
-    """Ouput result"""
+def save_file(file_name):
+    """Output result"""
     message("Saving file ...\n")
-    message("\tFilename '%s'\n" % filename)
+    message("\tFilename '%s'\n" % file_name)
 
     count = 0
     osm_root = ET.Element(
         "osm", version="0.6", generator="building_merge", upload="false"
     )
 
-    # First ouput all start/end nodes
+    # First output all start/end nodes
     for element in osm_elements:
 
         if element["type"] == "node":
@@ -843,7 +843,7 @@ def save_file(filename):
 
     # Produce OSM/XML file
     osm_tree = ET.ElementTree(osm_root)
-    osm_tree.write(filename, encoding="utf-8", method="xml", xml_declaration=True)
+    osm_tree.write(file_name, encoding="utf-8", method="xml", xml_declaration=True)
 
     message("\t%i elements saved\n" % count)
 
@@ -867,8 +867,8 @@ if __name__ == "__main__":
         sys.exit()
 
     if len(sys.argv) > 2 and sys.argv[2].isdigit():
-        margin_haus = int(sys.argv[2])
-        margin_tagged = margin_haus * 0.5
+        margin_hausdorff = int(sys.argv[2])
+        margin_tagged = margin_hausdorff * 0.5
 
     if "-debug" in sys.argv:
         debug = True
@@ -907,5 +907,5 @@ if __name__ == "__main__":
     used_time = time.time() - start_time
     message(
         "Done in %s (%i buildings per second)\n\n"
-        % (timeformat(used_time), len(osm_buildings) / used_time)
+        % (format_time(used_time), len(osm_buildings) / used_time)
     )

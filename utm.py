@@ -7,9 +7,9 @@ UTM coordinates are entered and displayed in meters.
 The ellipsoid model used for computations is WGS84.
  
 Usage:
-import latlonutm as ll
-[[northing, easting], zone, hemi] = ll.LatLonToUtm(lat, lon)
-[lat, lon] = ll.UtmToLatLon(northing, easting, zone, southhemi)
+import utm as ll
+[[northing, easting], zone, hemisphere] = ll.LatLonToUtm(lat, lon)
+[lat, lon] = ll.UtmToLatLon(northing, easting, zone, southern_hemisphere)
 
 Copied from: nenadsprojects
 https://nenadsprojects.wordpress.com/2012/12/27/latitude-and-longitude-utm-conversion/
@@ -203,8 +203,8 @@ def MapLatLonToXY(phi, lambda_pt, lambda_ctr):
     # Precalculate nu2
     nu2 = ep2 * math.pow(math.cos(phi), 2.0)
 
-    # Precalculate N
-    N = math.pow(sm_a, 2.0) / (sm_b * math.sqrt(1 + nu2))
+    # Precalculate n
+    n = math.pow(sm_a, 2.0) / (sm_b * math.sqrt(1 + nu2))
 
     # Precalculate t
     t = math.tan(phi)
@@ -219,33 +219,28 @@ def MapLatLonToXY(phi, lambda_pt, lambda_ctr):
     #   and northing
     #   -- l**1 and l**2 have coefficients of 1.0
     l3coef = 1.0 - t2 + nu2
-
     l4coef = 5.0 - t2 + 9 * nu2 + 4.0 * (nu2 * nu2)
-
     l5coef = 5.0 - 18.0 * t2 + (t2 * t2) + 14.0 * nu2 - 58.0 * t2 * nu2
-
     l6coef = 61.0 - 58.0 * t2 + (t2 * t2) + 270.0 * nu2 - 330.0 * t2 * nu2
-
     l7coef = 61.0 - 479.0 * t2 + 179.0 * (t2 * t2) - (t2 * t2 * t2)
-
     l8coef = 1385.0 - 3111.0 * t2 + 543.0 * (t2 * t2) - (t2 * t2 * t2)
 
     # Calculate easting (x)
     xy = [0.0, 0.0]
     xy[0] = (
-        N * math.cos(phi) * l
-        + (N / 6.0 * math.pow(math.cos(phi), 3.0) * l3coef * math.pow(l, 3.0))
-        + (N / 120.0 * math.pow(math.cos(phi), 5.0) * l5coef * math.pow(l, 5.0))
-        + (N / 5040.0 * math.pow(math.cos(phi), 7.0) * l7coef * math.pow(l, 7.0))
+        n * math.cos(phi) * l
+        + (n / 6.0 * math.pow(math.cos(phi), 3.0) * l3coef * math.pow(l, 3.0))
+        + (n / 120.0 * math.pow(math.cos(phi), 5.0) * l5coef * math.pow(l, 5.0))
+        + (n / 5040.0 * math.pow(math.cos(phi), 7.0) * l7coef * math.pow(l, 7.0))
     )
 
     # Calculate northing (y)
     xy[1] = (
         ArcLengthOfMeridian(phi)
-        + (t / 2.0 * N * math.pow(math.cos(phi), 2.0) * math.pow(l, 2.0))
-        + (t / 24.0 * N * math.pow(math.cos(phi), 4.0) * l4coef * math.pow(l, 4.0))
-        + (t / 720.0 * N * math.pow(math.cos(phi), 6.0) * l6coef * math.pow(l, 6.0))
-        + (t / 40320.0 * N * math.pow(math.cos(phi), 8.0) * l8coef * math.pow(l, 8.0))
+        + (t / 2.0 * n * math.pow(math.cos(phi), 2.0) * math.pow(l, 2.0))
+        + (t / 24.0 * n * math.pow(math.cos(phi), 4.0) * l4coef * math.pow(l, 4.0))
+        + (t / 720.0 * n * math.pow(math.cos(phi), 6.0) * l6coef * math.pow(l, 6.0))
+        + (t / 40320.0 * n * math.pow(math.cos(phi), 8.0) * l8coef * math.pow(l, 8.0))
     )
 
     return xy
@@ -266,26 +261,26 @@ def MapXYToLatLon(x, y, lambda_ctr):
     lambda_ctr - Longitude of the central meridian to be used, in radians.
 
     Outputs:
-    philambda - A 2-element containing the latitude and longitude
+    phi_lambda - A 2-element containing the latitude and longitude
     in radians.
 
     Remarks:
     The local variables Nf, nuf2, tf, and tf2 serve the same purpose as
     N, nu2, t, and t2 in MapLatLonToXY, but they are computed with respect
-    to the footpoint latitude phif.
+    to the footpoint latitude phi_f.
 
     x1frac, x2frac, x2poly, x3poly, etc. are to enhance readability and
     to optimize computations.
     """
 
-    # Get the value of phif, the footpoint latitude.
-    phif = FootpointLatitude(y)
+    # Get the value of phi_f, the footpoint latitude.
+    phi_f = FootpointLatitude(y)
 
     # Precalculate ep2
     ep2 = (math.pow(sm_a, 2.0) - math.pow(sm_b, 2.0)) / math.pow(sm_b, 2.0)
 
-    # Precalculate cos (phif)
-    cf = math.cos(phif)
+    # Precalculate cos (phi_f)
+    cf = math.cos(phi_f)
 
     # Precalculate nuf2
     nuf2 = ep2 * math.pow(cf, 2.0)
@@ -295,7 +290,7 @@ def MapXYToLatLon(x, y, lambda_ctr):
     Nfpow = Nf
 
     # Precalculate tf
-    tf = math.tan(phif)
+    tf = math.tan(phi_f)
     tf2 = tf * tf
     tf4 = tf2 * tf2
 
@@ -348,9 +343,9 @@ def MapXYToLatLon(x, y, lambda_ctr):
     x8poly = 1385.0 + 3633.0 * tf2 + 4095.0 * tf4 + 1575 * (tf4 * tf2)
 
     # Calculate latitude
-    philambda = [0.0, 0.0]
-    philambda[0] = (
-        phif
+    phi_lambda = [0.0, 0.0]
+    phi_lambda[0] = (
+        phi_f
         + x2frac * x2poly * (x * x)
         + x4frac * x4poly * math.pow(x, 4.0)
         + x6frac * x6poly * math.pow(x, 6.0)
@@ -358,7 +353,7 @@ def MapXYToLatLon(x, y, lambda_ctr):
     )
 
     # Calculate longitude
-    philambda[1] = (
+    phi_lambda[1] = (
         lambda_ctr
         + x1frac * x
         + x3frac * x3poly * math.pow(x, 3.0)
@@ -366,7 +361,7 @@ def MapXYToLatLon(x, y, lambda_ctr):
         + x7frac * x7poly * math.pow(x, 7.0)
     )
 
-    return philambda
+    return phi_lambda
 
 
 def LatLonToUTMXY(lat, lon, zone):
@@ -396,7 +391,7 @@ def LatLonToUTMXY(lat, lon, zone):
     return xy
 
 
-def UTMXYToLatLon(x, y, zone, southhemi):
+def UTMXYToLatLon(x, y, zone, southern_hemisphere):
     """
     Converts x and y coordinates in the Universal Transverse Mercator
     projection to a latitude/longitude pair.
@@ -405,26 +400,26 @@ def UTMXYToLatLon(x, y, zone, southhemi):
     x - The easting of the point, in meters.
     y - The northing of the point, in meters.
     zone - The UTM zone in which the point lies.
-    southhemi - True if the point is in the southern hemisphere;
+    southern_hemisphere - True if the point is in the southern hemisphere;
     false otherwise.
 
     Outputs:
-    latlon - A 2-element array containing the latitude and
+    lat_lon - A 2-element array containing the latitude and
     longitude of the point, in radians.
     """
     x -= 500000.0
     x /= UTMScaleFactor
 
     # If in southern hemisphere, adjust y accordingly.
-    if southhemi:
+    if southern_hemisphere:
         y -= 10000000.0
 
     y /= UTMScaleFactor
 
-    cmeridian = UTMCentralMeridian(zone)
-    latlon = MapXYToLatLon(x, y, cmeridian)
+    c_meridian = UTMCentralMeridian(zone)
+    lat_lon = MapXYToLatLon(x, y, c_meridian)
 
-    return latlon
+    return lat_lon
 
 
 def LatLonToUtm(lat, lon):
@@ -432,13 +427,13 @@ def LatLonToUtm(lat, lon):
     Converts lat lon to utm
 
     Inputs:
-    lat - lattitude in degrees
+    lat - latitude in degrees
     lon - longitude in degrees
 
     Outputs:
     xy - utm x(easting), y(northing)
     zone - utm zone
-    hemi - 'N' or 'S'
+    hemisphere - 'N' or 'S'
     """
 
     if (lon < -180.0) or (180.0 <= lon):
@@ -457,14 +452,14 @@ def LatLonToUtm(lat, lon):
     xy = LatLonToUTMXY(DegToRad(lat), DegToRad(lon), zone)
 
     # Determine hemisphere
-    hemi = "N"
+    hemisphere = "N"
     if lat < 0:
-        hemi = "S"
+        hemisphere = "S"
 
-    return [xy, zone, hemi]
+    return [xy, zone, hemisphere]
 
 
-def UtmToLatLon(x, y, zone, hemi):
+def UtmToLatLon(x, y, zone, hemisphere):
     """
     Converts UTM coordinates to lat long
 
@@ -472,29 +467,29 @@ def UtmToLatLon(x, y, zone, hemi):
     x - easting (in meters)
     y - northing (in meters)
     zone - UTM zone
-    hemi - 'N' or 'S'
+    hemisphere - 'N' or 'S'
 
     Outputs:
-    latlong - [lattitude, longitude] (in degrees)
+    lat_long - [latitude, longitude] (in degrees)
     """
     if (zone < 1) or (60 < zone):
         print("The UTM zone you entered is out of range -", zone)
         print("Please enter a number in the range [1, 60].")
         return 0
 
-    if (hemi != "N") and (hemi != "S"):
-        print("The hemisphere you entered is wrong -", hemi)
+    if (hemisphere != "N") and (hemisphere != "S"):
+        print("The hemisphere you entered is wrong -", hemisphere)
         print("Please enter N or S")
 
-    southhemi = False
-    if hemi == "S":
-        southhemi = True
+    southern_hemisphere = False
+    if hemisphere == "S":
+        southern_hemisphere = True
 
     # Convert
-    latlon = UTMXYToLatLon(x, y, zone, southhemi)
+    lat_lon = UTMXYToLatLon(x, y, zone, southern_hemisphere)
 
     # Convert to degrees
-    latlon[0] = RadToDeg(latlon[0])
-    latlon[1] = RadToDeg(latlon[1])
+    lat_lon[0] = RadToDeg(lat_lon[0])
+    lat_lon[1] = RadToDeg(lat_lon[1])
 
-    return latlon
+    return lat_lon

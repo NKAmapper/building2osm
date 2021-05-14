@@ -44,7 +44,7 @@ simplify_margin = (
 )
 
 curve_margin_max = 40  # Max angle for a curve (degrees)
-curve_margin_min = 0.3  # Min agnle for a curve (degrees)
+curve_margin_min = 0.3  # Min angle for a curve (degrees)
 curve_margin_nodes = 3  # At least three nodes in a curve (number of nodes)
 
 addr_margin = 100  # Max margin for matching address point with building centre, for building levels info (meters)
@@ -72,7 +72,7 @@ def message(text):
     sys.stderr.flush()
 
 
-def timeformat(sec):
+def format_time(sec):
     """Format time"""
     if sec > 3600:
         return "%i:%02i:%02i hours" % (sec / 3600, (sec % 3600) / 60, sec % 60)
@@ -162,8 +162,8 @@ def inside_polygon(point, polygon):
                 if y <= max(p1y, p2y):
                     if x <= max(p1x, p2x):
                         if p1y != p2y:
-                            xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-                        if p1x == p2x or x <= xints:
+                            x_ints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                        if p1x == p2x or x <= x_ints:
                             inside = not inside
             p1x, p1y = p2x, p2y
 
@@ -221,13 +221,13 @@ def rotate_node(axis, r_angle, point):
     tr_y = point[1] - axis[1]
     tr_x = (point[0] - axis[0]) * math.cos(math.radians(axis[1]))
 
-    xrot = tr_x * math.cos(r_radians) - tr_y * math.sin(r_radians)
-    yrot = tr_x * math.sin(r_radians) + tr_y * math.cos(r_radians)
+    x_rot = tr_x * math.cos(r_radians) - tr_y * math.sin(r_radians)
+    y_rot = tr_x * math.sin(r_radians) + tr_y * math.cos(r_radians)
 
-    xnew = xrot / math.cos(math.radians(axis[1])) + axis[0]
-    ynew = yrot + axis[1]
+    x_new = x_rot / math.cos(math.radians(axis[1])) + axis[0]
+    y_new = y_rot + axis[1]
 
-    return (xnew, ynew)
+    return x_new, y_new
 
 
 def line_distance(s1, s2, p3):
@@ -289,15 +289,15 @@ def simplify_polygon(polygon, epsilon):
 
     Ramer-Douglas-Peucker method: https://en.wikipedia.org/wiki/Ramer–Douglas–Peucker_algorithm
     """
-    dmax = 0.0
+    d_max = 0.0
     index = 0
     for i in range(1, len(polygon) - 1):
         d = line_distance(polygon[0], polygon[-1], polygon[i])
-        if d > dmax:
+        if d > d_max:
             index = i
-            dmax = d
+            d_max = d
 
-    if dmax >= epsilon:
+    if d_max >= epsilon:
         new_polygon = simplify_polygon(polygon[: index + 1], epsilon)[
             :-1
         ] + simplify_polygon(polygon[index:], epsilon)
@@ -376,7 +376,7 @@ def load_building_types():
 def get_municipality(parameter):
     """Identify municipality name, unless more than one hit
 
-    Returns municipality number, or input paramter if not found
+    Returns municipality number, or input parameter if not found
     """
     if parameter.isdigit():
         return parameter
@@ -496,7 +496,7 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
 
 
 def load_area(municipality_id, min_bbox, max_bbox, level, force_divide):
-    """Recursivly split municipality BBOX into smaller quadrants if needed to fit within WFS limit."""
+    """Recursively split municipality BBOX into smaller quadrants if needed to fit within WFS limit."""
     # How many buildings from municipality within bbox?
     count_load = 0
     inside_box = 0
@@ -781,7 +781,7 @@ def load_neighbour_buildings(municipality_id):
             municipality["kommunenavnNorsk"],
             neighbour=True,
         )
-        message("loaded %i bulidings\n" % count)
+        message("loaded %i buildings\n" % count)
 
     message(
         "\tLoaded %i neighbour building points for reference\n"
@@ -1084,7 +1084,7 @@ def rectify_buildings():
     Supports single polygons, multipolygons (outer/inner) and group of connected buildings.
     """
     message("Rectify building polygons ...\n")
-    message("\tTreshold for square corners: 90 +/- %i degrees\n" % angle_margin)
+    message("\tThreshold for square corners: 90 +/- %i degrees\n" % angle_margin)
     message("\tMinimum length of wall: %.2f meters\n" % short_margin)
 
     # First identify nodes used by more than one way (usage > 1)
@@ -1130,7 +1130,7 @@ def rectify_buildings():
         ):
             continue
 
-        # 1. First identify buildings which are connected and must be rectifed as a group
+        # 1. First identify buildings which are connected and must be rectified as a group
         building_group = []
         check_neighbours = building_test["neighbours"]  # includes self
         while check_neighbours:
@@ -1146,7 +1146,7 @@ def rectify_buildings():
         if len(building_group) > 1:
             building_test["properties"]["VERIFY_GROUP"] = str(len(building_group))
 
-        # 2. Then build data strucutre for rectification process.
+        # 2. Then build data structure for rectification process.
         # "walls" will contain all (almost) straight segments of the polygons in the group.
         # "corners" will contain all the intersection points between walls.
         corners = {}
@@ -1230,7 +1230,7 @@ def rectify_buildings():
                         last_corner = polygon[i]
                         count_corners += 1
 
-                    # Not possible to recitfy if wall is other than (almost) straight line
+                    # Not possible to rectify if wall is other than (almost) straight line
                     elif abs(test_corner) > angle_margin:
                         conform = False
                         building["properties"]["DEBUG_NORECTIFY"] = (
@@ -1278,7 +1278,7 @@ def rectify_buildings():
                             len(corners[node]["walls"])
                             - corners[node]["walls"][::-1].index(wall)
                             - 1
-                        )  # Find last occurence
+                        )  # Find last occurrence
                         corners[node]["walls"].pop(wall_index)  # remove(wall)
                         if patch_walls[0] not in corners[node]["walls"]:
                             corners[node]["walls"].append(patch_walls[0])
@@ -1346,7 +1346,7 @@ def rectify_buildings():
         # Compute centre for rotation, average of all corner nodes in cluster of buildings
         axis = polygon_centre(list(corners.keys()))
 
-        # Compute median bearing, by which buildings will be rotatatet
+        # Compute median bearing, by which buildings will be rotated
         if max(bearings) - min(bearings) > 90:
             for i, wall in enumerate(bearings):
                 if 0 <= wall < 90:
@@ -1497,7 +1497,7 @@ def rectify_buildings():
 
 
 def save_file(municipality_id, municipality_name):
-    """Ouput geojson file"""
+    """Output geojson file"""
     filename = (
         "bygninger_"
         + municipality_id
@@ -1579,7 +1579,7 @@ def process_municipality(municipality_id, municipality_name):
 
         save_file(municipality_id, municipality_name)
 
-        message("Done in %s\n\n" % timeformat(time.time() - mun_start_time))
+        message("Done in %s\n\n" % format_time(time.time() - mun_start_time))
     else:
         failed_runs.append(municipality_name)
 
@@ -1637,7 +1637,7 @@ if __name__ == "__main__":
                 process_municipality(mun_id, municipalities[mun_id])
         message(
             "%s done in %s\n\n"
-            % (municipalities[municipality_id], timeformat(time.time() - start_time))
+            % (municipalities[municipality_id], format_time(time.time() - start_time))
         )
         if failed_runs:
             message("*** Failed runs: %s\n\n" % (", ".join(failed_runs)))
