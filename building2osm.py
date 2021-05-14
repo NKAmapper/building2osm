@@ -66,20 +66,14 @@ status_codes = {
 }
 
 
-# Output message to console
-
-
 def message(text):
-
+    """Output message to console"""
     sys.stderr.write(text)
     sys.stderr.flush()
 
 
-# Format time
-
-
 def timeformat(sec):
-
+    """Format time"""
     if sec > 3600:
         return "%i:%02i:%02i hours" % (sec / 3600, (sec % 3600) / 60, sec % 60)
     elif sec > 60:
@@ -88,11 +82,8 @@ def timeformat(sec):
         return "%i seconds" % sec
 
 
-# Format decimal number
-
-
 def format_decimal(number):
-
+    """Format decimal number"""
     if number:
         number = "%.1f" % float(number)
         return number.rstrip("0").rstrip(".")
@@ -100,12 +91,11 @@ def format_decimal(number):
         return ""
 
 
-# Compute approximation of distance between two coordinates, (lat,lon), in meters
-# Works for short distances
-
-
 def distance(point1, point2):
+    """Compute approximation of distance between two coordinates, (lat,lon), in meters
 
+    Works for short distances
+    """
     lon1, lat1, lon2, lat2 = map(
         math.radians, [point1[0], point1[1], point2[0], point2[1]]
     )
@@ -114,15 +104,14 @@ def distance(point1, point2):
     return 6371000.0 * math.sqrt(x * x + y * y)  # Metres
 
 
-# Calculate coordinate area of polygon in square meters
-# Simple conversion to planar projection, works for small areas
-# < 0: Clockwise
-# > 0: Counter-clockwise
-# = 0: Polygon not closed
-
-
 def polygon_area(polygon):
+    """Calculate coordinate area of polygon in square meters
 
+    Simple conversion to planar projection, works for small areas
+        < 0: Clockwise
+        > 0: Counter-clockwise
+        = 0: Polygon not closed
+    """
     if polygon[0] == polygon[-1]:
         lat_dist = math.pi * 6371000.0 / 180.0
 
@@ -143,11 +132,8 @@ def polygon_area(polygon):
         return 0
 
 
-# Calculate centre of polygon, or of list of nodes
-
-
 def polygon_centre(polygon):
-
+    """Calculate centre of polygon, or of list of nodes"""
     length = len(polygon)
     if polygon[0] == polygon[-1]:
         length -= 1
@@ -160,12 +146,10 @@ def polygon_centre(polygon):
     return (x / length, y / length)
 
 
-# Tests whether point (x,y) is inside a polygon
-# Ray tracing method
-
-
 def inside_polygon(point, polygon):
+    """Tests whether point (x,y) is inside a polygon
 
+    Ray tracing method"""
     if polygon[0] == polygon[-1]:
         x, y = point
         n = len(polygon)
@@ -189,11 +173,8 @@ def inside_polygon(point, polygon):
         return False
 
 
-# Return bearing in degrees of line between two points (longitude, latitude)
-
-
 def bearing(point1, point2):
-
+    """Return bearing in degrees of line between two points (longitude, latitude)"""
     lon1, lat1, lon2, lat2 = map(
         math.radians, [point1[0], point1[1], point2[0], point2[1]]
     )
@@ -206,12 +187,11 @@ def bearing(point1, point2):
     return angle
 
 
-# Return the difference between two bearings.
-# Negative degrees to the left, positive to the right.
-
-
 def bearing_difference(bearing1, bearing2):
+    """Return the difference between two bearings.
 
+    Negative degrees to the left, positive to the right.
+    """
     delta = (bearing2 - bearing1 + 360) % 360
 
     if delta > 180:
@@ -220,24 +200,22 @@ def bearing_difference(bearing1, bearing2):
     return delta
 
 
-# Return the shift in bearing at a junction.
-# Negative degrees to the left, positive to the right.
-
-
 def bearing_turn(point1, point2, point3):
+    """Return the shift in bearing at a junction.
 
+    Negative degrees to the left, positive to the right.
+    """
     bearing1 = bearing(point1, point2)
     bearing2 = bearing(point2, point3)
 
     return bearing_difference(bearing1, bearing2)
 
 
-# Rotate point with specified angle around axis point.
-# https://gis.stackexchange.com/questions/246258/transforming-data-from-a-rotated-pole-lat-lon-grid-into-regular-lat-lon-coordina
-
-
 def rotate_node(axis, r_angle, point):
+    """Rotate point with specified angle around axis point.
 
+    https://gis.stackexchange.com/questions/246258/transforming-data-from-a-rotated-pole-lat-lon-grid-into-regular-lat-lon-coordina
+    """
     r_radians = math.radians(r_angle)  # *(math.pi/180)
 
     tr_y = point[1] - axis[1]
@@ -252,12 +230,11 @@ def rotate_node(axis, r_angle, point):
     return (xnew, ynew)
 
 
-# Compute closest distance from point p3 to line segment [s1, s2].
-# Works for short distances.
-
-
 def line_distance(s1, s2, p3):
+    """Compute closest distance from point p3 to line segment [s1, s2].
 
+    Works for short distances.
+    """
     x1, y1, x2, y2, x3, y3 = map(
         math.radians, [s1[0], s1[1], s2[0], s2[1], p3[0], p3[1]]
     )
@@ -291,7 +268,6 @@ def line_distance(s1, s2, p3):
         y4 = y1 + param * dy
 
     # Also compute distance from p to segment
-
     x = x4 - x3
     y = y4 - y3
     distance = 6371000 * math.sqrt(x * x + y * y)  # In meters
@@ -308,12 +284,11 @@ def line_distance(s1, s2, p3):
     return distance
 
 
-# Simplify polygon, i.e. reduce nodes within epsilon distance.
-# Ramer-Douglas-Peucker method: https://en.wikipedia.org/wiki/Ramer–Douglas–Peucker_algorithm
-
-
 def simplify_polygon(polygon, epsilon):
+    """Simplify polygon, i.e. reduce nodes within epsilon distance.
 
+    Ramer-Douglas-Peucker method: https://en.wikipedia.org/wiki/Ramer–Douglas–Peucker_algorithm
+    """
     dmax = 0.0
     index = 0
     for i in range(1, len(polygon) - 1):
@@ -332,12 +307,11 @@ def simplify_polygon(polygon, epsilon):
     return new_polygon
 
 
-# Parse WKT coordinates and return polygon list of (longitude, latitude).
-# Omit equal coordinates in sequence.
-
-
 def parse_polygon(coord_text):
+    """Parse WKT coordinates and return polygon list of (longitude, latitude).
 
+    Omit equal coordinates in sequence.
+    """
     split_coord = coord_text.split(" ")
     coordinates = []
     last_node1 = (None, None)
@@ -358,11 +332,8 @@ def parse_polygon(coord_text):
     return coordinates
 
 
-# Transform url characters
-
-
 def fix_url(url):
-
+    """Transform url characters"""
     return (
         url.replace("Æ", "E")
         .replace("Ø", "O")
@@ -374,12 +345,11 @@ def fix_url(url):
     )
 
 
-# Load conversion CSV table for tagging building types.
-# Format in CSV: "key=value + key=value + ..."
-
-
 def load_building_types():
+    """Load conversion CSV table for tagging building types.
 
+    Format in CSV: "key=value + key=value + ..."
+    """
     url = "https://raw.githubusercontent.com/NKAmapper/building2osm/main/building_types.csv"
     file = urllib.request.urlopen(url)
     building_csv = csv.DictReader(
@@ -403,12 +373,11 @@ def load_building_types():
     file.close()
 
 
-# Identify municipality name, unless more than one hit
-# Returns municipality number, or input paramter if not found
-
-
 def get_municipality(parameter):
+    """Identify municipality name, unless more than one hit
 
+    Returns municipality number, or input paramter if not found
+    """
     if parameter.isdigit():
         return parameter
 
@@ -431,11 +400,8 @@ def get_municipality(parameter):
             return parameter
 
 
-# Load dict of all municipalities
-
-
 def load_municipalities():
-
+    """Load dict of all municipalities"""
     url = "https://ws.geonorge.no/kommuneinfo/v1/fylkerkommuner?filtrer=fylkesnummer%2Cfylkesnavn%2Ckommuner.kommunenummer%2Ckommuner.kommunenavnNorsk"
     file = urllib.request.urlopen(url)
     data = json.load(file)
@@ -451,13 +417,12 @@ def load_municipalities():
     municipalities["00"] = "Norge"
 
 
-# Load building polygons from WFS within given BBOX.
-# Note: Max 10.000 buildings will be returned from WFS. No paging provided.
-# Data parsed as text lines for performance reasons (very simple data structure)
-
-
 def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
+    """Load building polygons from WFS within given BBOX.
 
+    Note: Max 10.000 buildings will be returned from WFS. No paging provided.
+    Data parsed as text lines for performance reasons (very simple data structure)
+    """
     bbox_list = [str(min_bbox[1]), str(min_bbox[0]), str(max_bbox[1]), str(max_bbox[0])]
 
     url = (
@@ -530,11 +495,8 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
     return count_load
 
 
-# Recursivly split municipality BBOX into smaller quadrants if needed to fit within WFS limit.
-
-
 def load_area(municipality_id, min_bbox, max_bbox, level, force_divide):
-
+    """Recursivly split municipality BBOX into smaller quadrants if needed to fit within WFS limit."""
     # How many buildings from municipality within bbox?
     count_load = 0
     inside_box = 0
@@ -616,11 +578,8 @@ def load_area(municipality_id, min_bbox, max_bbox, level, force_divide):
     return count_load
 
 
-# Get municipality BBOX and kick off recursive splitting into smaller BBOX quadrants
-
-
 def load_coordinates_municipality(municipality_id):
-
+    """Get municipality BBOX and kick off recursive splitting into smaller BBOX quadrants"""
     message("Load building polygons ...\n")
     message("\tLoading ... %6i " % len(buildings))
 
@@ -636,7 +595,6 @@ def load_coordinates_municipality(municipality_id):
     )  # Start with full bbox
 
     # Adjust building tagging according to size
-
     for building in buildings.values():
         if (
             building["geometry"]["type"] == "Polygon"
@@ -666,17 +624,15 @@ def load_coordinates_municipality(municipality_id):
     )
 
 
-# Get info about buildings from cadastral registry.
-# To aid data fetching of building polygons from WFS + to be merged with polygons later.
-# Function can also load building info from neighbour municipalities, to aid bbox splitting when loading building polygons.
-
-
 def load_building_info(municipality_id, municipality_name, neighbour):
+    """Get info about buildings from cadastral registry.
 
+    To aid data fetching of building polygons from WFS + to be merged with polygons later.
+    Function can also load building info from neighbour municipalities, to aid bbox splitting when loading building polygons.
+    """
     global max_download
 
     # Namespace
-
     ns_gml = "http://www.opengis.net/gml/3.2"
     ns_app = (
         "http://skjema.geonorge.no/SOSI/produktspesifikasjon/Matrikkelen-Bygningspunkt"
@@ -685,7 +641,6 @@ def load_building_info(municipality_id, municipality_name, neighbour):
     ns = {"gml": ns_gml, "app": ns_app}
 
     # Load file from GeoNorge
-
     url = (
         "https://nedlasting.geonorge.no/geonorge/Basisdata/MatrikkelenBygning/GML/Basisdata_%s_%s_25833_MatrikkelenBygning_GML.zip"
         % (municipality_id, municipality_name)
@@ -804,11 +759,10 @@ def load_building_info(municipality_id, municipality_name, neighbour):
     return count
 
 
-# Load centre coordinate for all buildings in neighbour municipalities, to make bbox splitting more accurate when loading building polygons.
-
-
 def load_neighbour_buildings(municipality_id):
-
+    """Load centre coordinate for all buildings in neighbour municipalities,
+    to make bbox splitting more accurate when loading building polygons.
+    """
     message("Load building points for neighbour municipalities ...\n")
 
     # Load neighbour municipalities
@@ -835,20 +789,15 @@ def load_neighbour_buildings(municipality_id):
     )
 
 
-# Identify the closest building (if any) and add levels tag
-
-
 def assign_levels_to_building(main_levels, roof_levels, point):
-
+    """Identify the closest building (if any) and add levels tag"""
     # Calculate bbox for search
-
     min_lat = point[1] - addr_margin / 111500.0
     max_lat = point[1] + addr_margin / 111500.0
     min_lon = point[0] - addr_margin / (math.cos(math.radians(min_lat)) * 111320.0)
     max_lon = point[0] + addr_margin / (math.cos(math.radians(max_lat)) * 111320.0)
 
     # Loop buildings to identify closest building
-
     found_ref = None
     for ref, building in iter(buildings.items()):
         if (
@@ -878,7 +827,6 @@ def assign_levels_to_building(main_levels, roof_levels, point):
                 break
 
     # If found, add levels tags
-
     if found_ref:
         building = buildings[found_ref]
         if "building:levels" in building["properties"] and main_levels != int(
@@ -902,14 +850,12 @@ def assign_levels_to_building(main_levels, roof_levels, point):
                 building["properties"]["roof:levels"] = str(roof_levels)
 
 
-# Load building level information from cadastral registry.
-# Only for apartments.
-
-
 def load_building_levels(municipality_id, municipality_name):
+    """Load building level information from cadastral registry.
 
+    Only for apartments.
+    """
     # Load file from GeoNorge
-
     url = (
         "https://nedlasting.geonorge.no/geonorge/Basisdata/MatrikkelenAdresseLeilighetsniva/CSV/Basisdata_%s_%s_4258_MatrikkelenAdresseLeilighetsniva_CSV.zip"
         % (municipality_id, municipality_name)
@@ -955,7 +901,6 @@ def load_building_levels(municipality_id, municipality_name):
             }
 
         # Count levels if available
-
         level = row["bruksenhetsnummerTekst"][:3]
         if level:
             levels[level[0]] = max(levels[level[0]], int(level[1:]))
@@ -968,9 +913,7 @@ def load_building_levels(municipality_id, municipality_name):
 
 
 # Simplify polygon
-# Remove redundant nodes, i.e. nodes on (almost) staight lines
-
-
+# Remove redundant nodes, i.e. nodes on (almost) straight lines
 def simplify_buildings():
 
     message("Simplify polygons ...\n")
@@ -980,7 +923,6 @@ def simplify_buildings():
     )
 
     # Make dict of all nodes with count of usage
-
     count = 0
     nodes = {}
     for ref, building in iter(buildings.items()):
@@ -996,7 +938,6 @@ def simplify_buildings():
     message("\t%i nodes used by more than one building\n" % count)
 
     # Identify redundant nodes, i.e. nodes on an (almost) straight line
-
     count = 0
     for ref, building in iter(buildings.items()):
         if building["geometry"]["type"] == "Polygon" and (
@@ -1006,7 +947,6 @@ def simplify_buildings():
             for polygon in building["geometry"]["coordinates"]:
 
                 # First discover curved walls, to keep more detail
-
                 curves = set()
                 curve = set()
                 last_bearing = 0
@@ -1037,7 +977,6 @@ def simplify_buildings():
                     count += 1
 
                 # Then simplify polygon
-
                 if curves:
                     # Light simplification for curved buildings
 
@@ -1060,7 +999,6 @@ def simplify_buildings():
                                 nodes[node] -= 1
                 else:
                     # Simplification for buildings without curves
-
                     last_node = polygon[-2]
                     for i in range(len(polygon) - 1):
                         angle = bearing_turn(last_node, polygon[i], polygon[i + 1])
@@ -1097,14 +1035,12 @@ def simplify_buildings():
         message("\tIdentified %i buildings with curved walls\n" % count)
 
     # Create set of nodes which may be deleted without conflicts
-
     already_removed = len(remove_nodes)
     for node in nodes:
         if nodes[node] == 0:
             remove_nodes.add(node)
 
     # Remove nodes from polygons
-
     count_building = 0
     count_remove = 0
     for ref, building in iter(buildings.items()):
@@ -1128,11 +1064,8 @@ def simplify_buildings():
     )
 
 
-# Upddate corner dict
-
-
 def update_corner(corners, wall, node, used):
-
+    """Update corner dict"""
     if node not in corners:
         corners[node] = {"used": 0, "walls": []}
 
@@ -1142,21 +1075,19 @@ def update_corner(corners, wall, node, used):
         corners[node]["walls"].append(wall)
 
 
-# Make square corners if possible.
-# Based on method used by JOSM:
-#   https://josm.openstreetmap.de/browser/trunk/src/org/openstreetmap/josm/actions/OrthogonalizeAction.java
-# The only input data required is the building dict, where each member is a standard geojson feature member.
-# Supports single polygons, multipolygons (outer/inner) and group of connected buildings.
-
-
 def rectify_buildings():
+    """Make square corners if possible.
 
+    Based on method used by JOSM:
+    https://josm.openstreetmap.de/browser/trunk/src/org/openstreetmap/josm/actions/OrthogonalizeAction.java
+    The only input data required is the building dict, where each member is a standard geojson feature member.
+    Supports single polygons, multipolygons (outer/inner) and group of connected buildings.
+    """
     message("Rectify building polygons ...\n")
     message("\tTreshold for square corners: 90 +/- %i degrees\n" % angle_margin)
     message("\tMinimum length of wall: %.2f meters\n" % short_margin)
 
     # First identify nodes used by more than one way (usage > 1)
-
     count = 0
     nodes = {}
     for ref, building in iter(buildings.items()):
@@ -1173,7 +1104,6 @@ def rectify_buildings():
             building["neighbours"] = [building]
 
     # Add list of neighbours to each building (other buildings which share one or more node)
-
     for node in nodes.values():
         if node["use"] > 1:
             for parent in node["parents"]:
@@ -1184,7 +1114,6 @@ def rectify_buildings():
     message("\t%i nodes used by more than one building\n" % count)
 
     # Then loop buildings and rectify where possible.
-
     count_rectify = 0
     count_not_rectify = 0
     count_remove = 0
@@ -1202,7 +1131,6 @@ def rectify_buildings():
             continue
 
         # 1. First identify buildings which are connected and must be rectifed as a group
-
         building_group = []
         check_neighbours = building_test["neighbours"]  # includes self
         while check_neighbours:
@@ -1221,7 +1149,6 @@ def rectify_buildings():
         # 2. Then build data strucutre for rectification process.
         # "walls" will contain all (almost) straight segments of the polygons in the group.
         # "corners" will contain all the intersection points between walls.
-
         corners = {}
         walls = []
         conform = True  # Will be set to False if rectification is not possible
@@ -1368,7 +1295,6 @@ def rectify_buildings():
             continue
 
         # 3. Remove unused nodes
-
         for node in list(corners.keys()):
             if corners[node]["used"] == 0:
                 for patch in walls:
@@ -1380,7 +1306,6 @@ def rectify_buildings():
                 count_remove += 1
 
         # 4. Get average bearing of all ways
-
         bearings = []
         group_bearing = 90.0  # For first patch in group, corresponding to axis 1
         group_axis = 1
@@ -1422,7 +1347,6 @@ def rectify_buildings():
         axis = polygon_centre(list(corners.keys()))
 
         # Compute median bearing, by which buildings will be rotatatet
-
         if max(bearings) - min(bearings) > 90:
             for i, wall in enumerate(bearings):
                 if 0 <= wall < 90:
@@ -1442,7 +1366,6 @@ def rectify_buildings():
 
         # 5. Combine connected walls with same axis
         # After this section, the wall list in corners is no longer accurate
-
         walls = [wall for patch in walls for wall in patch]  # Flatten walls
 
         combine_walls = (
@@ -1488,12 +1411,10 @@ def rectify_buildings():
                 )
 
         # 6. Rotate by average bearing
-
         for node, corner in iter(corners.items()):
             corner["new_node"] = rotate_node(axis, avg_bearing, node)
 
         # 7. Rectify nodes
-
         for wall in walls:
 
             # 			# Skip 45 degree walls
@@ -1517,7 +1438,6 @@ def rectify_buildings():
                     corners[node]["new_node"] = (x, corners[node]["new_node"][1])
 
         # 8. Rotate back
-
         for node, corner in iter(corners.items()):
             corner["new_node"] = rotate_node(axis, -avg_bearing, corner["new_node"])
             corner["new_node"] = (
@@ -1526,7 +1446,6 @@ def rectify_buildings():
             )
 
         # 9. Construct new polygons
-
         # Check if relocated nodes are off
         relocated = 0
         for building in building_group:
@@ -1540,7 +1459,6 @@ def rectify_buildings():
         if relocated < rectify_margin:
 
             # Construct new polygons
-
             for building in building_group:
                 relocated = 0
                 for i, polygon in enumerate(building["geometry"]["coordinates"]):
@@ -1578,11 +1496,8 @@ def rectify_buildings():
     message("\t%i buildings could not be rectified\n" % count_not_rectify)
 
 
-# Ouput geojson file
-
-
 def save_file(municipality_id, municipality_name):
-
+    """Ouput geojson file"""
     filename = (
         "bygninger_"
         + municipality_id
@@ -1603,7 +1518,6 @@ def save_file(municipality_id, municipality_name):
     features = {"type": "FeatureCollection", "features": []}
 
     # Prepare buildings to fit geosjon data structure
-
     count = 0
     for ref, building in iter(buildings.items()):
         if building["geometry"]["coordinates"]:
@@ -1627,7 +1541,6 @@ def save_file(municipality_id, municipality_name):
             features["features"].append(building)
 
     # Add removed nodes, for debugging
-
     if debug or verify:
         for node in remove_nodes:
             feature = {
@@ -1671,10 +1584,8 @@ def process_municipality(municipality_id, municipality_name):
         failed_runs.append(municipality_name)
 
 
-# Main program
-
 if __name__ == "__main__":
-
+    """Main program"""
     start_time = time.time()
     message("\n*** buildings2osm v%s ***\n\n" % version)
 
@@ -1686,7 +1597,6 @@ if __name__ == "__main__":
     failed_runs = []
 
     # Parse parameters
-
     if len(sys.argv) < 2:
         message("Please provide municipality number or name\n")
         message("Options: -original, -verify, -debug\n\n")
@@ -1703,7 +1613,6 @@ if __name__ == "__main__":
         original = True
 
     # Get selected municipality
-
     load_municipalities()
 
     municipality_query = sys.argv[1]
@@ -1712,7 +1621,6 @@ if __name__ == "__main__":
         sys.exit("Municipality '%s' not found, or ambiguous\n" % municipality_query)
 
     # Process
-
     load_building_types()
 
     if len(municipality_id) == 2:  # County

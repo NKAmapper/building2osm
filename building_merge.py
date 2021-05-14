@@ -47,20 +47,14 @@ similar_buildings = {
 debug = False  # Output extra tags for debugging/testing
 
 
-# Output message to console
-
-
 def message(text):
-
+    """Output message to console"""
     sys.stderr.write(text)
     sys.stderr.flush()
 
 
-# Format time
-
-
 def timeformat(sec):
-
+    """Format time"""
     if sec > 3600:
         return "%i:%02i:%02i hours" % (sec / 3600, (sec % 3600) / 60, sec % 60)
     elif sec > 60:
@@ -69,11 +63,8 @@ def timeformat(sec):
         return "%i seconds" % sec
 
 
-# Format decimal number
-
-
 def format_decimal(number):
-
+    """Format decimal number"""
     if number:
         number = "%.1f" % float(number)
         return number.rstrip("0").rstrip(".")
@@ -81,12 +72,11 @@ def format_decimal(number):
         return ""
 
 
-# Compute approximation of distance between two coordinates, (lat,lon), in meters
-# Works for short distances
-
-
 def distance(point1, point2):
+    """Compute approximation of distance between two coordinates, (lat,lon), in meters
 
+    Works for short distances
+    """
     lon1, lat1, lon2, lat2 = map(
         math.radians, [point1[0], point1[1], point2[0], point2[1]]
     )
@@ -95,12 +85,11 @@ def distance(point1, point2):
     return 6371000.0 * math.sqrt(x * x + y * y)  # Metres
 
 
-# Compute approximation of distance between two coordinates, (lat,lon), in meters
-# Works for short distances
-
-
 def distance2(point1, point2):
+    """Compute approximation of distance between two coordinates, (lat,lon), in meters
 
+    Works for short distances
+    """
     lon1, lat1, lon2, lat2 = map(
         math.radians, [point1[0], point1[1], point2[0], point2[1]]
     )
@@ -117,12 +106,11 @@ def distance2(point1, point2):
     return 6371000.0 * c  # Metres
 
 
-# Compute closest distance from point p3 to line segment [s1, s2].
-# Works for short distances.
-
-
 def line_distance(s1, s2, p3):
+    """Compute closest distance from point p3 to line segment [s1, s2].
 
+    Works for short distances.
+    """
     x1, y1, x2, y2, x3, y3 = map(
         math.radians, [s1[0], s1[1], s2[0], s2[1], p3[0], p3[1]]
     )
@@ -173,15 +161,14 @@ def line_distance(s1, s2, p3):
     return distance
 
 
-# Calculate coordinate area of polygon in square meters
-# Simple conversion to planar projection, works for small areas
-# < 0: Clockwise
-# > 0: Counter-clockwise
-# = 0: Polygon not closed
-
-
 def polygon_area(polygon):
+    """Calculate coordinate area of polygon in square meters
 
+    Simple conversion to planar projection, works for small areas
+        < 0: Clockwise
+        > 0: Counter-clockwise
+        = 0: Polygon not closed
+    """
     if polygon and polygon[0] == polygon[-1]:
         lat_dist = math.pi * 6371009.0 / 180.0
 
@@ -202,12 +189,11 @@ def polygon_area(polygon):
         return 0
 
 
-# Calculate center of polygon nodes (simple average method)
-# Note: If nodes are skewed to one side, the center will be skewed to the same side
-
-
 def polygon_center(polygon):
+    """Calculate center of polygon nodes (simple average method)
 
+    Note: If nodes are skewed to one side, the center will be skewed to the same side
+    """
     if len(polygon) == 0:
         return None
     elif len(polygon) == 1:
@@ -229,12 +215,11 @@ def polygon_center(polygon):
     return (x, y)
 
 
-# Calculate centroid of polygon
-# Source: https://en.wikipedia.org/wiki/Centroid#Of_a_polygon
-
-
 def polygon_centroid(polygon):
+    """Calculate centroid of polygon
 
+    Source: https://en.wikipedia.org/wiki/Centroid#Of_a_polygon
+    """
     if polygon[0] == polygon[-1]:
         x = 0
         y = 0
@@ -255,12 +240,10 @@ def polygon_centroid(polygon):
         return None
 
 
-# Calculate new node with given distance offset in meters
-# Works over short distances
-
-
 def coordinate_offset(node, distance):
+    """Calculate new node with given distance offset in meters
 
+    Works over short distances"""
     m = 1 / ((math.pi / 180.0) * 6378137.0)  # Degrees per meter
 
     latitude = node[1] + (distance * m)
@@ -269,13 +252,11 @@ def coordinate_offset(node, distance):
     return (longitude, latitude)
 
 
-# Calculate Hausdorff distance, including reverse.
-# Abdel Aziz Taha and Allan Hanbury: "An Efficient Algorithm for Calculating the Exact Hausdorff Distance"
-# https://publik.tuwien.ac.at/files/PubDat_247739.pdf
-
-
 def hausdorff_distance(p1, p2):
+    """Calculate Hausdorff distance, including reverse.
 
+    Abdel Aziz Taha and Allan Hanbury: "An Efficient Algorithm for Calculating the Exact Hausdorff Distance"
+    https://publik.tuwien.ac.at/files/PubDat_247739.pdf"""
     N1 = len(p1) - 1
     N2 = len(p2) - 1
 
@@ -325,12 +306,11 @@ def hausdorff_distance(p1, p2):
     return cmax
 
 
-# Identify municipality name, unless more than one hit
-# Returns municipality number, or input paramter if not found
-
-
 def get_municipality(parameter):
+    """Identify municipality name, unless more than one hit
 
+    Returns municipality number, or input paramter if not found
+    """
     if parameter.isdigit():
         return parameter
 
@@ -353,11 +333,8 @@ def get_municipality(parameter):
             return parameter
 
 
-# Load dict of all municipalities
-
-
 def load_municipalities():
-
+    """Load dict of all municipalities"""
     url = "https://ws.geonorge.no/kommuneinfo/v1/fylkerkommuner?filtrer=fylkesnummer%2Cfylkesnavn%2Ckommuner.kommunenummer%2Ckommuner.kommunenavnNorsk"
     file = urllib.request.urlopen(url)
     data = json.load(file)
@@ -369,11 +346,8 @@ def load_municipalities():
             ]
 
 
-# Load buildings from geojson file
-
-
 def load_import_buildings(filename):
-
+    """Load buildings from geojson file"""
     global import_buildings
 
     message("Loading import buildings ...\n")
@@ -385,7 +359,6 @@ def load_import_buildings(filename):
     import_buildings = data["features"]
 
     # Add centeroid and area
-
     for building in import_buildings:
         if (
             building["geometry"]["type"] == "Polygon"
@@ -403,7 +376,6 @@ def load_import_buildings(filename):
             del building["properties"]["DATE"]
 
         # Temporary fixes
-
         if "#672 " in building["properties"]["TYPE"]:
             building["properties"]["building"] = "religious"
 
@@ -431,11 +403,8 @@ def load_import_buildings(filename):
     message("\t%i buildings loaded\n" % len(import_buildings))
 
 
-# Load existing buildings from OSM Overpass
-
-
 def load_osm_buildings(municipality_id):
-
+    """Load existing buildings from OSM Overpass"""
     global osm_elements
 
     message("Loading existing buildings from OSM ...\n")
@@ -454,7 +423,6 @@ def load_osm_buildings(municipality_id):
     osm_elements = data["elements"]
 
     # Identify members of relations, to exclude from building matching
-
     relation_members = set()
     for element in osm_elements:
         if element["type"] == "relation":
@@ -462,7 +430,6 @@ def load_osm_buildings(municipality_id):
                 relation_members.add(member["ref"])  # OSM id of element
 
     # Create dict of nodes + list of buildings (ways tagged with building=*)
-
     for element in osm_elements:
         if element["type"] == "node":
             osm_nodes[element["id"]] = element
@@ -484,7 +451,6 @@ def load_osm_buildings(municipality_id):
                         osm_nodes[node_ref]["used"] += 1
 
     # Add polygon center and area
-
     tag_count = 0
     for building in osm_buildings:
         if "center" in building:
@@ -518,12 +484,11 @@ def load_osm_buildings(municipality_id):
     message("\t%i buildings with tags other than building=*\n" % tag_count)
 
 
-# Create new node with given tag
-# Used for debugging centers
-
-
 def add_node(node, tag):
+    """Create new node with given tag
 
+    Used for debugging centers
+    """
     global osm_id
 
     osm_id -= 1
@@ -539,11 +504,8 @@ def add_node(node, tag):
     osm_elements.append(node_element)
 
 
-# Create new way element for OSM
-
-
 def add_way(coordinates, osm_element):
-
+    """Create new way element for OSM"""
     global osm_id
 
     way_element = {"type": "way", "nodes": [], "tags": {}}
@@ -577,7 +539,6 @@ def add_way(coordinates, osm_element):
 
     else:
         # Delete old nodes if not used anymore, and replace with new nodes
-
         for node_ref in osm_element["nodes"]:
             if node_ref in osm_nodes:
                 osm_nodes[node_ref]["used"] -= 1
@@ -601,7 +562,6 @@ def add_building(building, osm_element):
         return
 
     # Simple polygon
-
     elif len(building["geometry"]["coordinates"]) == 1:
         way_element = add_way(building["geometry"]["coordinates"][0], osm_element)
 
@@ -649,7 +609,6 @@ def add_building(building, osm_element):
     # 		add_node(centroid, {'CENTROID': "yes"})
 
     # Multipolygon
-
     else:
         relation_element = {
             "type": "relation",
@@ -671,11 +630,8 @@ def add_building(building, osm_element):
         osm_elements.append(relation_element)
 
 
-# Do reverse match to verify that two buildings are each others' best match
-
-
 def reverse_match(import_building):
-
+    """Do reverse match to verify that two buildings are each others' best match"""
     found_building = None
     best_diff = 9999  # Dummy
 
@@ -705,11 +661,8 @@ def reverse_match(import_building):
     return (found_building, best_diff)
 
 
-# Merge import with OSM buildings
-
-
 def merge_buildings():
-
+    """Merge import with OSM buildings"""
     message("Merging buildings ...\n")
     message(
         "\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n"
@@ -785,7 +738,6 @@ def merge_buildings():
                         )
 
     # Add remaining import buildings which were not matched
-
     count_add = 0
     for building in import_buildings:
         if building["geometry"]["type"] == "Polygon":
@@ -806,11 +758,8 @@ def merge_buildings():
     message("\tAdded %i new buildings from import file\n" % count_add)
 
 
-# Generate one osm tag for output
-
-
 def tag_property(osm_element, tag_key, tag_value):
-
+    """Generate one osm tag for output"""
     tag_value = tag_value.strip()
     if tag_value:
         osm_element.append(ET.Element("tag", k=tag_key, v=tag_value))
@@ -832,11 +781,8 @@ def set_attributes(element, data):
         element.set("visible", "true")
 
 
-# Ouput result
-
-
 def save_file(filename):
-
+    """Ouput result"""
     message("Saving file ...\n")
     message("\tFilename '%s'\n" % filename)
 
@@ -846,7 +792,6 @@ def save_file(filename):
     )
 
     # First ouput all start/end nodes
-
     for element in osm_elements:
 
         if element["type"] == "node":
@@ -897,17 +842,14 @@ def save_file(filename):
                 )
 
     # Produce OSM/XML file
-
     osm_tree = ET.ElementTree(osm_root)
     osm_tree.write(filename, encoding="utf-8", method="xml", xml_declaration=True)
 
     message("\t%i elements saved\n" % count)
 
 
-# Main program
-
 if __name__ == "__main__":
-
+    """Main program"""
     start_time = time.time()
     message("\n*** building_merge %s ***\n\n" % version)
 
@@ -920,7 +862,6 @@ if __name__ == "__main__":
     osm_id = -1000
 
     # Parse parameters
-
     if len(sys.argv) < 2:
         message("Please provide municipality number or name\n\n")
         sys.exit()
@@ -933,7 +874,6 @@ if __name__ == "__main__":
         debug = True
 
     # Get municipality
-
     load_municipalities()
     municipality_query = sys.argv[1]
     municipality_id = get_municipality(municipality_query)
@@ -945,7 +885,6 @@ if __name__ == "__main__":
     )
 
     # Get filename
-
     filename = "bygninger_%s_%s.geojson" % (
         municipality_id,
         municipalities[municipality_id].replace(" ", "_"),
@@ -956,7 +895,6 @@ if __name__ == "__main__":
             filename = arg
 
     # Process
-
     load_import_buildings(filename)
     load_osm_buildings(municipality_id)
 

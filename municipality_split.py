@@ -129,9 +129,8 @@ def chunk(collection: Collection, n):
         yield tuple(itertools.islice(iterator, n))
 
 
-# Area necessary to calculate mass center of a polygon with holes.
 def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord, float]:
-
+    """Area necessary to calculate mass center of a polygon with holes."""
     if linear_ring[0] != linear_ring[-1]:
         raise RuntimeError("linear ring not closed")
 
@@ -153,8 +152,8 @@ def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord,
     return center_point, abs(area)
 
 
-# Calculate mass centre of polygon
 def centroid_polygon(polygon: PolygonCoord) -> PointCoord:
+    """Calculate mass centre of polygon"""
     center_point, outer_area = centroid_area_linear_ring(polygon[0])
     if inner_rings := polygon[1:]:
         cx = center_point[0] * outer_area
@@ -188,9 +187,8 @@ def bboxes_for_multipolygon(multipolygon: MultipolygonCoord) -> List[Bbox]:
     return [bbox_for_polygon(polygon) for polygon in multipolygon]
 
 
-# Ray tracing method
 def inside_linear_ring(point: PointCoord, linear_ring: LinearRingCoord):
-
+    """Ray tracing method"""
     if linear_ring[0] != linear_ring[-1]:
         raise RuntimeError("linear ring not closed")
 
