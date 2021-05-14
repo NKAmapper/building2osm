@@ -1,12 +1,16 @@
-import requests
-from io import BytesIO
-from zipfile import ZipFile
-import json
 import argparse
 import itertools
+import json
 from collections import defaultdict
-from typing import Tuple, List, Iterable, Iterator, Collection, Sequence, TypedDict, Dict, NamedTuple, Literal, Union
+from io import BytesIO
+from typing import (Collection, Dict, Iterable, Iterator, List, Literal,
+                    NamedTuple, Sequence, Tuple, TypedDict, Union)
+from zipfile import ZipFile
+
+import requests
+
 import utm
+
 try:
 	from lxml import etree
 except ImportError:

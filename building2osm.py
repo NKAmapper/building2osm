@@ -7,21 +7,20 @@
 # Creates geojson file with name "bygninger_4222_Bykle.osm" etc.
 
 
-import sys
-import time
 import copy
-import math
-import statistics
 import csv
 import json
+import math
+import statistics
+import subprocess
+import sys
+import time
 import urllib.request
 import zipfile
-import subprocess
-from io import TextIOWrapper
-from io import BytesIO
+from io import BytesIO, TextIOWrapper
 from xml.etree import ElementTree as ET
-import utm  # From building2osm on GitHub
 
+import utm  # From building2osm on GitHub
 
 version = "0.6.0"
 

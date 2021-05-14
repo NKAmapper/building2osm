@@ -13,8 +13,8 @@ import urllib.request
 import zipfile
 from io import BytesIO
 from xml.etree import ElementTree as ET
-from bs4 import BeautifulSoup
 
+from bs4 import BeautifulSoup
 
 version = "0.3.2"
 

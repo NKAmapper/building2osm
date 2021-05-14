@@ -21,7 +21,6 @@ http://home.hiwaay.net/~taylorc/toolbox/geography/geoutm.html
  
 import math
 
-
 # Ellipsoid model constants (actual values here are for WGS84)
 sm_a = 6378137.0
 sm_b = 6356752.314

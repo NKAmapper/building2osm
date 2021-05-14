@@ -7,13 +7,13 @@
 # geojson file from building2osm must be present in default folder. Other filename is optional parameter.
 # Creates OSM file (manual upload to OSM).
 
+import json
 import math
 import sys
 import time
-import json
-import urllib.request, urllib.parse
+import urllib.parse
+import urllib.request
 from xml.etree import ElementTree as ET
-
 
 version = "0.4.7"
 

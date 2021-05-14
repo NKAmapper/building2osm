@@ -1,4 +1,5 @@
-from municipality_split import linear_rings_assembler, polygon_assembler, buildings_inside_subdivision
+from municipality_split import (buildings_inside_subdivision,
+                                linear_rings_assembler, polygon_assembler)
 
 relation_ways = [
 	{"id": 500, "nodes": [1, 2, 3]},
