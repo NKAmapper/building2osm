@@ -149,15 +149,15 @@ def line_distance(s1, s2, p3):
     y = y4 - y3
     distance = 6371000 * math.sqrt(x * x + y * y)  # In meters
     """
-	# Project back to longitude/latitude
-
-	x4 = x4 / math.cos(y4)
-
-	lon = math.degrees(x4)
-	lat = math.degrees(y4)
-
-	return (lon, lat, distance)
-	"""
+    # Project back to longitude/latitude
+    
+    x4 = x4 / math.cos(y4)
+    
+    lon = math.degrees(x4)
+    lat = math.degrees(y4)
+    
+    return (lon, lat, distance)
+    """
     return distance
 
 
@@ -212,7 +212,7 @@ def polygon_center(polygon):
     x = x / length
     y = y / length
 
-    return (x, y)
+    return x, y
 
 
 def polygon_centroid(polygon):
@@ -234,7 +234,7 @@ def polygon_centroid(polygon):
         x = x / (3.0 * det)
         y = y / (3.0 * det)
 
-        return (x, y)
+        return x, y
 
     else:
         return None
@@ -249,7 +249,7 @@ def coordinate_offset(node, distance):
     latitude = node[1] + (distance * m)
     longitude = node[0] + (distance * m) / math.cos(math.radians(node[1]))
 
-    return (longitude, latitude)
+    return longitude, latitude
 
 
 def hausdorff_distance(p1, p2):
@@ -280,7 +280,7 @@ def hausdorff_distance(p1, p2):
             if d < c_min:
                 c_min = d
 
-        if c_min < 999999.9 and c_min > c_max and no_break:
+        if 999999.9 > c_min > c_max and no_break:
             c_max = c_min
 
     # 	return c_max
@@ -300,7 +300,7 @@ def hausdorff_distance(p1, p2):
             if d < c_min:
                 c_min = d
 
-        if c_min < 999999.9 and c_min > c_max and no_break:
+        if 999999.9 > c_min > c_max and no_break:
             c_max = c_min
 
     return c_max
@@ -411,7 +411,7 @@ def load_osm_buildings(municipality_id):
 
     query = (
         '[out:json][timeout:60];(area[ref=%s][admin_level=7][place=municipality];)->.a;(nwr["building"](area.a););(._;>;<;>;);out center meta;'
-        % (municipality_id)
+        % municipality_id
     )
     request = urllib.request.Request(
         "https://overpass-api.de/api/interpreter?data=" + urllib.parse.quote(query),
@@ -555,7 +555,6 @@ def add_way(coordinates, osm_element):
 
 
 def add_building(building, osm_element):
-
     global osm_id
 
     if building["geometry"]["type"] == "Point":
@@ -580,7 +579,6 @@ def add_building(building, osm_element):
                 in similar_buildings["commercial"]
             )
         ):
-
             way_element["tags"]["OSM_BUILDING"] = way_element["tags"]["building"]
 
         for tag in (
@@ -658,7 +656,7 @@ def reverse_match(import_building):
                 found_building = osm_building
                 best_diff = diff_hausdorff
 
-    return (found_building, best_diff)
+    return found_building, best_diff
 
 
 def merge_buildings():
@@ -720,7 +718,10 @@ def merge_buildings():
                 # Also check if both buildings are each others best match
                 found_reverse, reverse_hausdorff = reverse_match(found_building)
 
-                if found_reverse == osm_building and reverse_hausdorff < margin_hausdorff:
+                if (
+                    found_reverse == osm_building
+                    and reverse_hausdorff < margin_hausdorff
+                ):
 
                     # Buildings
                     if (
@@ -766,7 +767,6 @@ def tag_property(osm_element, tag_key, tag_value):
 
 
 def set_attributes(element, data):
-
     if "user" in data:
         element.set("version", str(data["version"]))
         element.set("user", data["user"])

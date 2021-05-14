@@ -170,7 +170,9 @@ def centroid_polygon(polygon: PolygonCoord) -> PointCoord:
 
 def point_inside_bbox(point: PointCoord, bbox: Bbox):
     p_lon, p_lat = point
-    return bbox.min_lat <= p_lat <= bbox.max_lat and bbox.min_lon <= p_lon <= bbox.max_lon
+    return (
+        bbox.min_lat <= p_lat <= bbox.max_lat and bbox.min_lon <= p_lon <= bbox.max_lon
+    )
 
 
 def bbox_for_polygon(polygon: PolygonCoord) -> Bbox:
