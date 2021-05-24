@@ -15,13 +15,13 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.4.7"
+version = "0.5.1"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
 osm_api = "https://api.openstreetmap.org/api/0.6/"  # Production database
 
-margin_haus = 10.0		# Maximum deviation between polygons (meters)
+margin_hausdorff = 10.0		# Maximum deviation between polygons (meters)
 margin_tagged = 5.0		# Maximum deviation between polygons if building is tagged (meters)
 margin_area = 0.5       # Max 50% difference of building areas
 
@@ -30,7 +30,8 @@ remove_addr = True 		# Remove addr tags from buildings
 # No warnings when replacing these building tags with each other
 similar_buildings = {
 	'residential': ["house", "detached", "semidetached_house", "terrace", "farm", "apartments", "residential", "cabin", "hut", "bungalow"],
-	'commercial':  ["retail", "commercial", "warehouse", "industrial", "office"]
+	'commercial':  ["retail", "commercial", "warehouse", "industrial", "office"],
+	'farm': ["barn", "farm_auxiliary", "shed", "cabin"]
 }
 
 debug = False 			# Output extra tags for debugging/testing
@@ -253,7 +254,7 @@ def hausdorff_distance(p1, p2):
 	N1 = len(p1) - 1
 	N2 = len(p2) - 1
 
-# Shuffling for small lists disbabled
+# Shuffling for small lists disabled
 #	random.shuffle(p1)
 #	random.shuffle(p2)
 
@@ -301,7 +302,7 @@ def hausdorff_distance(p1, p2):
 
 
 # Identify municipality name, unless more than one hit
-# Returns municipality number, or input paramter if not found
+# Returns municipality number, or input parameter if not found
 
 def get_municipality (parameter):
 
@@ -356,7 +357,7 @@ def load_import_buildings(filename):
 	file.close()
 	import_buildings = data['features']
 
-	# Add centeroid and area
+	# Add polygon center and area
 
 	for building in import_buildings:
 		if building['geometry']['type'] == "Polygon" and len(building['geometry']['coordinates']) == 1:
@@ -373,7 +374,7 @@ def load_import_buildings(filename):
 
 		# Temporary fixes
 
-		if "#672 " in building['properties']['TYPE']:
+		if "#672 " in building['properties']['TYPE'] or "#673 " in building['properties']['TYPE']:
 			building['properties']['building'] = "religious"
 
 		if building['properties']['building'] == "barracks":
@@ -501,9 +502,11 @@ def add_way(coordinates, osm_element):
 
 		node_tuple = (node[0], node[1])
 
+		# Either reuse node alreadyimported
 		if node_tuple in import_nodes:
 			node_id = import_nodes[ node_tuple ]['id']
 
+		# Or create new node
 		else:
 			osm_id -= 1
 			node_id = osm_id
@@ -557,7 +560,9 @@ def add_building(building, osm_element):
 			 	not (way_element['tags']['building'] in similar_buildings['residential'] and \
 			 		building['properties']['building'] in similar_buildings['residential']) and \
 			 	not (way_element['tags']['building'] in similar_buildings['commercial'] and \
-			 		building['properties']['building'] in similar_buildings['commercial']):
+			 		building['properties']['building'] in similar_buildings['commercial']) and \
+			 	not (way_element['tags']['building'] in similar_buildings['farm'] and \
+			 		building['properties']['building'] in similar_buildings['farm']):
 
 			way_element['tags']['OSM_BUILDING'] = way_element['tags']['building']
 
@@ -611,8 +616,8 @@ def reverse_match(import_building):
 	found_building = None
 	best_diff = 9999  # Dummy
 
-	min_bbox = coordinate_offset(import_building['center'], - 2 * margin_haus) #import_building['area'])
-	max_bbox = coordinate_offset(import_building['center'], + 2 * margin_haus) #import_building['area'])
+	min_bbox = coordinate_offset(import_building['center'], - 2 * margin_hausdorff) #import_building['area'])
+	max_bbox = coordinate_offset(import_building['center'], + 2 * margin_hausdorff) #import_building['area'])
 
 	for osm_building in osm_buildings:
 
@@ -635,7 +640,7 @@ def reverse_match(import_building):
 def merge_buildings():
 
 	message ("Merging buildings ...\n")
-	message ("\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n" % (margin_haus, margin_tagged))
+	message ("\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n" % (margin_hausdorff, margin_tagged))
 	message ("\tMaximum area difference: %i %%\n" % (margin_area * 100))
 
 	count = len(osm_buildings)
@@ -649,8 +654,8 @@ def merge_buildings():
 
 		# Get bbox for limiting search below
 
-		min_bbox = coordinate_offset(osm_building['center'], - 2 * margin_haus) # osm_building['area'])
-		max_bbox = coordinate_offset(osm_building['center'], + 2 * margin_haus) # osm_building['area'])
+		min_bbox = coordinate_offset(osm_building['center'], - 2 * margin_hausdorff) # osm_building['area'])
+		max_bbox = coordinate_offset(osm_building['center'], + 2 * margin_hausdorff) # osm_building['area'])
 
 		for import_building in import_buildings:
 
@@ -670,12 +675,12 @@ def merge_buildings():
 				osm_building['tags']['HAUSDORFF'] = " %.2f" % best_diff
 
 			# Also check if Hausdorff distance is within given limit (shorter limit for tagged buildings)
-			if best_diff < margin_haus and "tagged" not in osm_building or best_diff < margin_tagged:
+			if best_diff < margin_hausdorff and "tagged" not in osm_building or best_diff < margin_tagged:
 
 				# Also check if both buildings are each others best match
 				found_reverse, reverse_haus = reverse_match(found_building)
 
-				if found_reverse == osm_building and reverse_haus < margin_haus:
+				if found_reverse == osm_building and reverse_haus < margin_hausdorff:
 
 					# Buildings 
 					if margin_area < osm_building['area'] / found_building['area'] < 1.0 / margin_area:
@@ -698,6 +703,25 @@ def merge_buildings():
 	message ("\tRemaining %i buildings from OSM not merged (%i%%)\n" % \
 		(len(osm_buildings) - count_merge, 100 - 100.0 * count_merge / len(osm_buildings)))
 	message ("\tAdded %i new buildings from import file\n" % count_add)
+
+
+
+# Indent XML output
+
+def indent_tree(elem, level=0):
+    i = "\n" + level*"  "
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = i + "  "
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+        for elem in elem:
+            indent_tree(elem, level+1)
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+    else:
+        if level and (not elem.tail or not elem.tail.strip()):
+            elem.tail = i
 
 
 
@@ -728,7 +752,7 @@ def set_attributes (element, data):
 
 
 
-# Ouput result
+# Output result
 
 def save_file(filename):
 
@@ -738,7 +762,7 @@ def save_file(filename):
 	count = 0
 	osm_root = ET.Element("osm", version="0.6", generator="building_merge", upload="false")
 
-	# First ouput all start/end nodes
+	# First output all start/end nodes
 
 	for element in osm_elements:
 
@@ -780,6 +804,7 @@ def save_file(filename):
 	# Produce OSM/XML file
 
 	osm_tree = ET.ElementTree(osm_root)
+	indent_tree(osm_root)
 	osm_tree.write(filename, encoding="utf-8", method="xml", xml_declaration=True)
 
 	message ("\t%i elements saved\n" % count)
@@ -807,8 +832,8 @@ if __name__ == '__main__':
 		sys.exit()
 
 	if len(sys.argv) > 2 and sys.argv[2].isdigit():
-		margin_haus = int(sys.argv[2])
-		margin_tagged = margin_haus * 0.5
+		margin_hausdorff = int(sys.argv[2])
+		margin_tagged = margin_hausdorff * 0.5
 
 	if "-debug" in sys.argv:
 		debug = True
