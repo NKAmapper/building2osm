@@ -9,7 +9,7 @@ Usage:
 <code>python3 building2osm.py \<municipality\> [-split] [-original] [-verify] [-debug]</code>
 
 Parameters:
-* _municipality_ - Name of the municipality to generate.
+* _municipality_ - Name of the municipality to generate. Output for several municipalities is generated if county name or "Norway" is given. 
 * <code>-split</code> - Also split output file into smaller subdivisions ("bydel" or post districts).
 * <code>-original</code> - Produce file without any modifications.
 * <code>-verify</code> - Include extra tags for verification of topology modificatons.
@@ -37,6 +37,8 @@ Usage:
  
 Parameter:
 * _municipality_ - Name of the municipality to split.
+* <code>--subdivision bydel</code> - Split municipality according to boroughs.
+* <code>--subdivision bydel</code> - Split municipality according to post districts (please check for leftover buildings if post districts do not correspond exactly to municipality boundaries).
 
 ### Notes
 * Source data is from the Cadastral registry of Kartverket
@@ -53,9 +55,13 @@ Parameter:
   * New buildings are loaded from the geojson import file.
   * Existing buildings are loaded from OSM.
   * New and existing buildings which are each other's best match within the given maximum Hausdorff distance (default 10 metres) are automatically conflated. They also need to have similar size (default 50% difference).
-  * The _OSM_BUILDING_ tag will show which building tag was used by the existing building, unless they are in similar residential/commercial categories.
-  * Use the To-do plugin in JOSM to resolve _Overlapping buildings_ and _Building within buildings_, and to check _OSM_BUILDING_.
-  * Search for <code>type:node ways:0 -untagged</code> to check if entrances or other tagged nodes needs to be reconnected to the new buildings.
+  * The _OSM_BUILDING_ tag will show which building tag was used by the existing building, unless they are in similar residential/commercial/farm categories.
+  * Use the To-do plugin in JOSM to:
+    1) Resolve _Overlapping buildings_. 
+    2) Resolve _Building within buildings_.
+    3) Check _OSM_BUILDING_ for manual retagging of building types.
+    4) Check untouched existing OSM buildings.
+    5) Check if entrances or other tagged nodes needs to be reconnected to the new buildings (search for <code>type:node ways:0 -untagged</code>).
 
 ### References
 
