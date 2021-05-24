@@ -23,7 +23,7 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.6.0"
+version = "0.6.2"
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -41,7 +41,7 @@ rectify_margin = 0.2		# Max relocation distance for nodes during rectification b
 simplify_margin = 0.05		# Minimum tolerance for buildings with curves in simplification (meters)
 
 curve_margin_max = 40		# Max angle for a curve (degrees)
-curve_margin_min = 0.3		# Min agnle for a curve (degrees)
+curve_margin_min = 0.3		# Min angle for a curve (degrees)
 curve_margin_nodes = 3		# At least three nodes in a curve (number of nodes)
 
 addr_margin = 100			# Max margin for matching address point with building centre, for building levels info (meters)
@@ -380,7 +380,7 @@ def load_building_types():
 
 
 # Identify municipality name, unless more than one hit
-# Returns municipality number, or input paramter if not found
+# Returns municipality number, or input parameter if not found
 
 def get_municipality (parameter):
 
@@ -421,6 +421,7 @@ def load_municipalities():
 		municipalities[ county['fylkesnummer'] ] = county['fylkesnavn']
 		for municipality in county['kommuner']:
 			municipalities[ municipality['kommunenummer'] ] = municipality['kommunenavnNorsk']
+	municipalities['2100'] = "Svalbard"
 	municipalities['00'] = "Norge"
 
 
@@ -434,7 +435,7 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
 	bbox_list = [str(min_bbox[1]), str(min_bbox[0]), str(max_bbox[1]), str(max_bbox[0])]
 
 	url = "https://wfs.geonorge.no/skwms1/wfs.inspire-bu-core2d?" + \
-			"service=WFS&version=2.0.0&request=GetFeature&&srsName=EPSG:4326&typename=Building&bbox=" + ",".join(bbox_list)
+			"service=WFS&version=2.0.0&request=GetFeature&srsName=EPSG:4326&typename=Building&bbox=" + ",".join(bbox_list)
 #	message ("\n\tQuery: %s\n\t" % url)
 	file_in = urllib.request.urlopen(url)
 	file = TextIOWrapper(file_in, "utf-8")
@@ -466,8 +467,6 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
 			coordinates.append( parse_polygon(geo) )
 
 		if "</wfs:member>" in line:
-			if ref == "12305729":
-				message ("URL: %s\n" % url)
 			if ref in buildings and coordinates:
 				buildings[ref]['geometry']['type'] = "Polygon"
 				buildings[ref]['geometry']['coordinates'] = coordinates
@@ -486,14 +485,14 @@ def load_building_coordinates(municipality_id, min_bbox, max_bbox, level):
 			message ("%s*** Too many buildings in box, force split box and reloading" % ("\t" * level))
 		count_load += load_area(municipality_id, min_bbox, max_bbox, level, force_divide=True)
 	elif not verbose:
-		countdown = len(buildings) - sum((building['geometry']['type'] == "Polygon") for building in buildings.values())
-		message ("\r\tLoading ... %6i " % countdown)
+		count_total_loaded = sum((building['geometry']['type'] == "Polygon") for building in buildings.values())
+		message ("\r\tLoading ... %6i " % count_total_loaded)
 		
 	return count_load
 
 
 
-# Recursivly split municipality BBOX into smaller quadrants if needed to fit within WFS limit.
+# Recursively split municipality BBOX into smaller quadrants if needed to fit within WFS limit.
 
 def load_area(municipality_id, min_bbox, max_bbox, level, force_divide):
 
@@ -549,12 +548,16 @@ def load_area(municipality_id, min_bbox, max_bbox, level, force_divide):
 def load_coordinates_municipality(municipality_id):
 
 	message ("Load building polygons ...\n")
-	message ("\tLoading ... %6i " % len(buildings))
+	message ("\tLoading ... ")
 
-	file = urllib.request.urlopen("https://ws.geonorge.no/kommuneinfo/v1/kommuner/" + municipality_id)
-	data = json.load(file)
-	file.close()
-	bbox = data['avgrensningsboks']['coordinates'][0]
+
+	if municipality_id != "2100":
+		file = urllib.request.urlopen("https://ws.geonorge.no/kommuneinfo/v1/kommuner/" + municipality_id)
+		data = json.load(file)
+		file.close()
+		bbox = data['avgrensningsboks']['coordinates'][0]
+	else:
+		bbox = [[9.0, 74.0], [], [35.0, 81.0], []]  # Svalbard
 
 	count_load = load_area(municipality_id, bbox[0], bbox[2], 1, force_divide=False)  # Start with full bbox
 
@@ -709,19 +712,20 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 
 def load_neighbour_buildings(municipality_id):
 
-	message ("Load building points for neighbour municipalities ...\n")
+	if municipality_id != "2100":  # Svalbard
+		message ("Load building points for neighbour municipalities ...\n")
 
-	# Load neighbour municipalities
-	file = urllib.request.urlopen("https://ws.geonorge.no/kommuneinfo/v1/kommuner/" + municipality_id + "/nabokommuner")
-	data = json.load(file)
-	file.close()
+		# Load neighbour municipalities
+		file = urllib.request.urlopen("https://ws.geonorge.no/kommuneinfo/v1/kommuner/" + municipality_id + "/nabokommuner")
+		data = json.load(file)
+		file.close()
 
-	for municipality in data:
-		message ("\tLoading %s ... " % municipality['kommunenavnNorsk'])
-		count = load_building_info(municipality['kommunenummer'], municipality['kommunenavnNorsk'], neighbour=True)
-		message ("loaded %i bulidings\n" % count)
+		for municipality in data:
+			message ("\tLoading %s ... " % municipality['kommunenavnNorsk'])
+			count = load_building_info(municipality['kommunenummer'], municipality['kommunenavnNorsk'], neighbour=True)
+			message ("loaded %i buildings\n" % count)
 
-	message ("\tLoaded %i neighbour building points for reference\n" % len(neighbour_buildings))
+		message ("\tLoaded %i neighbour building points for reference\n" % len(neighbour_buildings))
 
 
 
@@ -981,7 +985,7 @@ def update_corner(corners, wall, node, used):
 def rectify_buildings():
 
 	message ("Rectify building polygons ...\n")
-	message ("\tTreshold for square corners: 90 +/- %i degrees\n" % angle_margin)
+	message ("\tThreshold for square corners: 90 +/- %i degrees\n" % angle_margin)
 	message ("\tMinimum length of wall: %.2f meters\n" % short_margin)
 
 	# First identify nodes used by more than one way (usage > 1)
@@ -1030,7 +1034,7 @@ def rectify_buildings():
 		if building_test['geometry']['type'] != "Polygon" or "rectified" in building_test:
 			continue
 
-		# 1. First identify buildings which are connected and must be rectifed as a group
+		# 1. First identify buildings which are connected and must be rectified as a group
 
 		building_group = []
 		check_neighbours = building_test['neighbours']  # includes self
@@ -1044,7 +1048,7 @@ def rectify_buildings():
 		if len(building_group) > 1:
 			building_test['properties']['VERIFY_GROUP'] = str(len(building_group)) 
 
-		# 2. Then build data strucutre for rectification process.
+		# 2. Then build data structure for rectification process.
 		# "walls" will contain all (almost) straight segments of the polygons in the group.
 		# "corners" will contain all the intersection points between walls.
 
@@ -1104,7 +1108,7 @@ def rectify_buildings():
 						last_corner = polygon[i]
 						count_corners += 1
 
-					# Not possible to recitfy if wall is other than (almost) straight line
+					# Not possible to rectify if wall is other than (almost) straight line
 					elif abs(test_corner) > angle_margin:
 						conform = False
 						building['properties']['DEBUG_NORECTIFY'] = "No, %i degree angle" % test_corner
@@ -1134,7 +1138,7 @@ def rectify_buildings():
 					# Wrap from end to start
 					patch_walls[0]['nodes'] = wall['nodes'] + patch_walls[0]['nodes']
 					for node in wall['nodes']:
-						wall_index = len(corners[node]['walls']) - corners[node]['walls'][::-1].index(wall) - 1  # Find last occurence
+						wall_index = len(corners[node]['walls']) - corners[node]['walls'][::-1].index(wall) - 1  # Find last occurrence
 						corners[node]['walls'].pop(wall_index)  # remove(wall)
 						if patch_walls[0] not in corners[node]['walls']:
 							corners[node]['walls'].append(patch_walls[0])
@@ -1204,7 +1208,7 @@ def rectify_buildings():
 		# Compute centre for rotation, average of all corner nodes in cluster of buildings
 		axis = polygon_centre(list(corners.keys()))
 
-		# Compute median bearing, by which buildings will be rotatatet
+		# Compute median bearing, by which buildings will be rotated
 
 		if max(bearings) - min(bearings) > 90:
 			for i, wall in enumerate(bearings):
@@ -1329,7 +1333,7 @@ def rectify_buildings():
 
 
 
-# Ouput geojson file
+# Output geojson file
 
 def save_file(municipality_id, municipality_name):
 
@@ -1415,7 +1419,7 @@ def process_municipality(municipality_id, municipality_name):
 
 		save_file(municipality_id, municipality_name)
 
-		message("Done in %s\n\n" % timeformat(time.time() - mun_start_time))
+		message("Done in %s\n\n\n" % timeformat(time.time() - mun_start_time))
 	else:
 		failed_runs.append(municipality_name)
 
@@ -1461,14 +1465,18 @@ if __name__ == '__main__':
 	if municipality_id is None or municipality_id not in municipalities:
 		sys.exit("Municipality '%s' not found, or ambiguous\n" % municipality_query)
 
+	start_municipality = ""
+	if len(sys.argv) > 2 and sys.argv[2].isdigit():
+		start_municipality = sys.argv[2]
+
 	# Process
 
 	load_building_types()
 
 	if len(municipality_id) == 2:  # County
 		message ("Generating building files for all municipalities in %s\n\n" % municipalities[municipality_id])
-		for mun_id in municipalities:
-			if len(mun_id) == 4 and mun_id[0:2] == municipality_id or municipality_id == "00":
+		for mun_id in sorted(municipalities.keys()):
+			if len(mun_id) == 4 and mun_id[0:2] == municipality_id and mun_id >= start_municipality or municipality_id == "00":
 				process_municipality(mun_id, municipalities[ mun_id])
 		message("%s done in %s\n\n" % (municipalities[municipality_id], timeformat(time.time() - start_time)))
 		if failed_runs:
