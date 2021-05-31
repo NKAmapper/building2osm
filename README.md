@@ -5,6 +5,8 @@ Generates import files for OpenStreetMap with buliding footprints from Kartverke
 
 Generates geojson import file with building footprints.
 
+_Note: The WFS service used is currently not delivering building polygons._
+
 Usage:
 <code>python3 building2osm.py \<municipality\> [-split] [-original] [-verify] [-debug]</code>
 
