@@ -524,7 +524,6 @@ def get_arguments() -> argparse.Namespace:
 	parser.add_argument('input', help="municipality name, kode or filename from building2osm")
 	parser.add_argument('-s', '--subdivision', choices=['bydel', 'postnummer'])
 	parser.add_argument('-a', '--area', dest='save_area', action='store_true', help="saves areas as geojson",)
-	parser.add_argument('-l', '--leftovers', dest='save_leftovers', action='store_true', help="saves leftover buildings in separate file")
 	return parser.parse_args()
 
 
@@ -590,11 +589,11 @@ def main():
 		print(f"\tSaved {len(geojson['features'])} buildings to '{filename}'")
 
 	leftover_buildings = [b for b in buildings if b['properties']['ref:bygningsnr'] not in imported_refs]
-	if leftover_buildings and arguments.save_leftovers:
+	if leftover_buildings:
 		geojson = features2geojson(leftover_buildings)
 		filename = (
 			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
-			f'{arguments.subdivision}_leftovers.geojson'
+			f'{arguments.subdivision}_andre.geojson'
 		)
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2, ensure_ascii=False)
