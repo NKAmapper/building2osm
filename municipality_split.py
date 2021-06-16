@@ -571,10 +571,13 @@ def main():
 
 	print(f'\nSplitting municipality into {subdivision_plural}')
 
+
+	imported_refs = set()
 	for subdivision in subdivisions:
 		relevant_buildings = buildings_inside_subdivision(buildings, subdivision)
 		geojson = features2geojson(relevant_buildings)
 		subdivision_name = subdivision['properties']['name']
+		imported_refs.update(b['properties']['ref:bygningsnr'] for b in geojson['features'])
 
 		filename = (
 			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
@@ -584,9 +587,21 @@ def main():
 			json.dump(geojson, file, indent=2, ensure_ascii=False)
 
 		print(f"\tSaved {len(geojson['features'])} buildings to '{filename}'")
-		      
+
+	leftover_buildings = [b for b in buildings if b['properties']['ref:bygningsnr'] not in imported_refs]
+	if leftover_buildings:
+		geojson = features2geojson(leftover_buildings)
+		filename = (
+			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
+			f'{arguments.subdivision}_andre.geojson'
+		)
+		with open(filename, 'w', encoding='utf-8') as file:
+			json.dump(geojson, file, indent=2, ensure_ascii=False)
+
+		print(f"\tSaved {len(geojson['features'])} leftover buildings to '{filename}'")
+	
 	print("")
 
-		      
+
 if __name__ == "__main__":
 	main()
