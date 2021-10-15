@@ -659,6 +659,8 @@ def merge_buildings():
 
 	# Remove import buildings which have already been imported
 
+	message ("\tDiscover any earlier import ...\n")
+	
 	import_refs = {}
 	for import_building in import_buildings:
 		import_refs[ import_building['properties']['ref:bygningsnr'] ] = import_building
