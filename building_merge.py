@@ -11,27 +11,30 @@ import math
 import sys
 import time
 import json
+import os.path
 import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.5.1"
+version = "0.6.0"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
-osm_api = "https://api.openstreetmap.org/api/0.6/"  # Production database
+overpass_api = "https://overpass-api.de/api/interpreter"  # Overpass endpoint
 
-margin_hausdorff = 10.0		# Maximum deviation between polygons (meters)
+import_folder = "~/Jottacloud/osm/bygninger/"  # Folder containing import building files (default folder tried first)
+
+margin_hausdorff = 10.0	# Maximum deviation between polygons (meters)
 margin_tagged = 5.0		# Maximum deviation between polygons if building is tagged (meters)
 margin_area = 0.5       # Max 50% difference of building areas
 
 remove_addr = True 		# Remove addr tags from buildings
 
-# No warnings when replacing these building tags with each other
+# No warnings when replacing these building tags with each other within same category
 similar_buildings = {
 	'residential': ["house", "detached", "semidetached_house", "terrace", "farm", "apartments", "residential", "cabin", "hut", "bungalow"],
 	'commercial':  ["retail", "commercial", "warehouse", "industrial", "office"],
-	'farm': ["barn", "farm_auxiliary", "shed", "cabin"]
+	'farm':        ["barn", "farm_auxiliary", "shed", "cabin"]
 }
 
 debug = False 			# Output extra tags for debugging/testing
@@ -352,6 +355,13 @@ def load_import_buildings(filename):
 	message ("Loading import buildings ...\n")
 	message ("\tFilename '%s'\n" % filename)
 
+	if not os.path.isfile(filename):
+		test_filename = os.path.expanduser(import_folder + filename)
+		if os.path.isfile(test_filename):
+			filename = test_filename
+		else:
+			sys.exit("\t*** File not found\n\n")
+
 	file = open(filename)
 	data = json.load(file)
 	file.close()
@@ -401,7 +411,7 @@ def load_osm_buildings(municipality_id):
 
 	query = '[out:json][timeout:60];(area[ref=%s][admin_level=7][place=municipality];)->.a;(nwr["building"](area.a););(._;>;<;>;);out center meta;'\
 			 % (municipality_id)
-	request = urllib.request.Request("https://overpass-api.de/api/interpreter?data=" + urllib.parse.quote(query), headers=request_header)
+	request = urllib.request.Request(overpass_api + "?data=" + urllib.parse.quote(query), headers=request_header)
 	file = urllib.request.urlopen(request)
 	data = json.load(file)
 	file.close()
@@ -621,7 +631,7 @@ def reverse_match(import_building):
 
 	for osm_building in osm_buildings:
 
-		if "area" in osm_building and \
+		if "area" in osm_building and "ref:bygningsnr" not in osm_building['tags'] and \
 					min_bbox[0] < osm_building['center'][0] < max_bbox[0] and \
 					min_bbox[1] < osm_building['center'][1] < max_bbox[1]:  # and "action" not in osm_building and \
 
@@ -645,12 +655,33 @@ def merge_buildings():
 
 	count = len(osm_buildings)
 	count_merge = 0
+	count_ref = 0
+
+	# Remove import buildings which have already been imported
+
+	import_refs = {}
+	for import_building in import_buildings:
+		import_refs[ import_building['properties']['ref:bygningsnr'] ] = import_building
+
+	for osm_building in osm_buildings:
+		if "ref:bygningsnr" in osm_building['tags']:
+			for ref in osm_building['tags']['ref:bygningsnr'].split(";"):
+				if ref in import_refs:
+					import_buildings.remove(import_refs[ref])
+
+	# Loop osm buildings and attempt to find matching import buildings
 
 	for osm_building in osm_buildings[:]:
 		count -= 1
 		message ("\r\t%i " % count)
 		found_building = None
 		best_diff = 9999  # Dummy
+
+		# Skip test if ref:bygningsnr exists (building has already been imported)
+
+		if "ref:bygningsnr" in osm_building['tags']:
+			count_ref += 1
+			continue
 
 		# Get bbox for limiting search below
 
@@ -700,8 +731,10 @@ def merge_buildings():
 			count_add += 1
 
 	message ("\r\tMerged %i buildings from OSM (%i%%)\n" % (count_merge, 100.0 * count_merge / len(osm_buildings)))
+	if count_ref > 0:
+		message ("\tSkipped %i already imported buildings in OSM (%i%%)\n" % (count_ref, 100.0 * count_ref / len(osm_buildings)))
 	message ("\tRemaining %i buildings from OSM not merged (%i%%)\n" % \
-		(len(osm_buildings) - count_merge, 100 - 100.0 * count_merge / len(osm_buildings)))
+		(len(osm_buildings) - count_merge - count_ref, 100 - 100.0 * (count_merge + count_ref) / len(osm_buildings)))
 	message ("\tAdded %i new buildings from import file\n" % count_add)
 
 
