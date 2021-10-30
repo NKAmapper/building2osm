@@ -53,8 +53,8 @@ Parameter:
   * Redundant nodes are removed if they are located on an (almost) straight line.
   * Curved walls are only simplified lightly.
 * Output is stored in a geosjon file which may be loaded into JOSM when the OpenData plugin has been installed. Please read the [import plan](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Norway_Building_Import) for guiding on how to do the import.
-* The _building_merge_ program conflates the import buildings with existing buildings in OSM.
-  * New buildings are loaded from the geojson import file.
+* The _building_merge.py_ program conflates the import buildings with existing buildings in OSM.
+  * New buildings are loaded from the geojson import file. You may split the import file into smaller parts using _municipality_split.py_ or manually.
   * Existing buildings are loaded from OSM.
   * New and existing buildings which are each other's best match within the given maximum Hausdorff distance (default 10 metres) are automatically conflated. They also need to have similar size (default 50% difference).
   * The _OSM_BUILDING_ tag will show which building tag was used by the existing building, unless they are in similar residential/commercial/farm categories.
@@ -64,6 +64,7 @@ Parameter:
     3) Check _OSM_BUILDING_ for manual retagging of building types.
     4) Check untouched existing OSM buildings.
     5) Check if entrances or other tagged nodes needs to be reconnected to the new buildings (search for <code>type:node ways:0 -untagged</code>).
+  * The _building_merge.py_ program may be run several times for the same municipality. Only buildings with new _ref:bygningsnr_ will be added each time.
 
 ### References
 
