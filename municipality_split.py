@@ -13,6 +13,9 @@ except ImportError:
 	import xml.etree.ElementTree as etree
 
 
+version = "1.2.0"
+
+
 class RelationMember(TypedDict):
 	type: Literal['node', 'way', 'relation']
 	ref: int
@@ -122,6 +125,7 @@ def chunk(collection: Collection, n):
 def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord, float]:
 
 	if linear_ring[0] != linear_ring[-1]:
+#		linear_ring.append(linear_ring[0])
 		raise RuntimeError('linear ring not closed')
 
 	delta_x, delta_y = linear_ring[0]
@@ -184,6 +188,7 @@ def bboxes_for_multipolygon(multipolygon: MultipolygonCoord) -> List[Bbox]:
 def inside_linear_ring(point: PointCoord, linear_ring: LinearRingCoord):
 
 	if linear_ring[0] != linear_ring[-1]:
+#		linear_ring.append(linear_ring[0])
 		raise RuntimeError('linear ring not closed')
 
 	px, py = point
@@ -405,13 +410,41 @@ def post_codes_request(
 	return tree.getroot()
 
 
+def electorate_request(
+		session: requests.Session, municipality_id: str, municipality_name: str
+) -> etree.Element:
+
+	wfs_filter = (
+		'<Filter>'
+			'<PropertyIsEqualTo>'
+				'<ValueReference xmlns:app="http://skjema.geonorge.no/SOSI/produktspesifikasjon/Stemmekretser/20210701">'
+					'app:kommunenummer'
+				'</ValueReference>'
+				f'<Literal>{municipality_id}</Literal>'
+			'</PropertyIsEqualTo>'
+		'</Filter>'
+	)
+
+	url = (
+		'https://wfs.geonorge.no/skwms1/services/wfs.stemmekretser?service=WFS&Version=2.0.0&request=GetFeature'
+		f'&typename=app:Stemmekrets&srsName=urn:ogc:def:crs:EPSG::4326&Filter={wfs_filter}'
+	)
+
+	response = session.get(url)
+	tree = etree.ElementTree(etree.fromstring(response.text))
+	return tree.getroot()
+
+
 def utm_to_lon_lat(
-		points: Iterable[PointCoord], utm_zone: int, hemisphere: Literal['N', 'S'] = 'N'
+		points: Iterable[PointCoord], epsg: int, hemisphere: Literal['N', 'S'] = 'N'
 ) -> Iterator[PointCoord]:
 
 	for point in points:
 		x, y = point
-		lat, lon = utm.UtmToLatLon(x, y, utm_zone, hemisphere)
+		if epsg == 4326:
+			lat, lon = x, y
+		else:
+			lat, lon = utm.UtmToLatLon(x, y, epsg % 100, hemisphere)
 		yield lon, lat
 
 
@@ -421,32 +454,52 @@ def gml_pos_list(pos_list: etree.Element) -> Iterator[PointCoord]:
 		yield map(float, point)
 
 
-def gml_patch_assembler(gml_patch: etree.Element, namespace, utm_zone: int) -> PolygonCoord:
+def gml_patch_assembler(gml_patch: etree.Element, namespace, epsg: int) -> PolygonCoord:
+
 	gml_outer = gml_patch.find("./gml:exterior", namespace)
 	pos_list = gml_outer.find(".//gml:posList", namespace)
-	outer_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), utm_zone))
+	outer_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), epsg))
 	rings = [outer_ring]
+
 	if gml_inners := gml_patch.findall("./gml:interior", namespace):
 		for gml_inner in gml_inners:
-			pos_list = gml_inner.find(".//gml:posList", namespace)
-			inner_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), utm_zone))
+			inner_ring = list(utm_to_lon_lat(gml_pos_list(pos_list), epsg))
 			rings.append(inner_ring)
+
 	return rings
 
 
-def gml_polygon_assembler(
+def gml_postcodes_polygon_assembler(
 		gml_surface: etree.Element, namespace
 ) -> Union[PolygonGeometry, MultipolygonGeometry]:
 
-	utm_zone = int(gml_surface.get("srsName")[-2:])
+	epsg = int(gml_surface.get("srsName").split(":")[-1])
 	patches = gml_surface.findall("./gml:patches/gml:PolygonPatch", namespace)
 	if len(patches) == 1:
 		geometry_type = 'Polygon'
 		patch = patches[0]
-		coordinates = gml_patch_assembler(patch, namespace, utm_zone)
+		coordinates = gml_patch_assembler(patch, namespace, epsg)
 	else:
 		geometry_type = 'Multipolygon'
-		coordinates = [gml_patch_assembler(patch, namespace, utm_zone) for patch in patches]
+		coordinates = [gml_patch_assembler(patch, namespace, epsg) for patch in patches]
+
+	return {'type': geometry_type, 'coordinates': coordinates}
+
+
+def gml_electorate_polygon_assembler(
+		gml_surface: etree.Element, namespace
+) -> Union[PolygonGeometry, MultipolygonGeometry]:
+
+	patches = gml_surface.findall("./gml:Polygon", namespace)
+	epsg = int(patches[0].get("srsName").split(":")[-1])
+
+	if len(patches) == 1:
+		geometry_type = 'Polygon'
+		patch = patches[0]
+		coordinates = gml_patch_assembler(patch, namespace, epsg)
+	else:
+		geometry_type = 'Multipolygon'
+		coordinates = [gml_patch_assembler(patch, namespace, epsg) for patch in patches]
 
 	return {'type': geometry_type, 'coordinates': coordinates}
 
@@ -461,11 +514,30 @@ def postcodes2features(gml_feature_collection: etree.Element) -> Iterator[Featur
 
 	for gml_feature in postcode_filter:
 		surface = gml_feature.find('.//gml:Surface', namespace)
-		geometry = gml_polygon_assembler(surface, namespace)
+		geometry = gml_postcodes_polygon_assembler(surface, namespace)
 		postcode = gml_feature.find('.//app:postnummer', namespace).text
 		postal_place = gml_feature.find('.//app:poststed', namespace).text
 		postal_place = postal_place[0] + postal_place[1:].lower()
 		properties = {'name': f"{postcode} {postal_place}", 'postcode': postcode, 'postal place': postal_place}
+		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
+
+
+def electorate2features(gml_feature_collection: etree.Element) -> Iterator[Feature]:
+	namespace = {
+		"gml": "http://www.opengis.net/gml/3.2",
+		"wfs": "http://www.opengis.net/wfs/2.0",
+		"app": "http://skjema.geonorge.no/SOSI/produktspesifikasjon/Stemmekretser/20210701"
+	}
+	gml_features = gml_feature_collection.iterfind("./wfs:member", namespace)
+	electorate_filter = filter(lambda f: f.find('./app:Stemmekrets', namespace) is not None,  gml_features)
+
+	for gml_feature in electorate_filter:
+		surface = gml_feature.find('.//app:område', namespace)
+		geometry = gml_electorate_polygon_assembler(surface, namespace)
+		electorate_code = gml_feature.find('.//app:stemmekretsnummer', namespace).text
+		electorate_place = gml_feature.find('.//app:stemmekretsnavn', namespace).text
+		electorate_place = electorate_place.title()
+		properties = {'name': f"{electorate_code} {electorate_place}", 'electorate code': electorate_code, 'electorate place': electorate_place}
 		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
 
 
@@ -522,7 +594,7 @@ def get_municipality(parameter: str, municipalities: Dict[str, str]):
 def get_arguments() -> argparse.Namespace:
 	parser = argparse.ArgumentParser()
 	parser.add_argument('input', help="municipality name, kode or filename from building2osm")
-	parser.add_argument('-s', '--subdivision', choices=['bydel', 'postnummer'])
+	parser.add_argument('-s', '--subdivision', choices=['bydel', 'postnummer', 'valgkrets'])
 	parser.add_argument('-a', '--area', dest='save_area', action='store_true', help="saves areas as geojson",)
 	return parser.parse_args()
 
@@ -557,6 +629,12 @@ def main():
 		xml_root = post_codes_request(session, municipality_id, municipality_name)
 		subdivisions = postcodes2features(xml_root)
 		print("Loaded postal codes")
+
+	elif arguments.subdivision == 'valgkrets':
+		subdivision_plural = 'valgkretser'
+		xml_root = electorate_request(session, municipality_id, municipality_name)
+		subdivisions = electorate2features(xml_root)
+		print("Loaded electoral districts")	
 
 	else:
 		raise RuntimeError(f'subdivision {arguments.subdivision} not known')
@@ -605,3 +683,4 @@ def main():
 
 if __name__ == "__main__":
 	main()
+	
