@@ -40,7 +40,8 @@ Usage:
 Parameter:
 * _municipality_ - Name of the municipality to split.
 * <code>--subdivision bydel</code> - Split municipality according to boroughs.
-* <code>--subdivision bydel</code> - Split municipality according to post districts (please check for leftover buildings if post districts do not correspond exactly to municipality boundaries).
+* <code>--subdivision postnummer</code> - Split municipality according to post districts (please check for leftover buildings if post districts do not correspond exactly to municipality boundaries).
+* <code>--subdivision valgkrets</code> - Split municipality according to electoral districts (fewer than post districts in large towns).
 
 ### Notes
 * Source data is from the Cadastral registry of Kartverket
