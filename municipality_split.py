@@ -1,6 +1,7 @@
 import requests
 from io import BytesIO
 from zipfile import ZipFile
+import os.path
 import json
 import argparse
 import itertools
@@ -13,7 +14,9 @@ except ImportError:
 	import xml.etree.ElementTree as etree
 
 
-version = "1.2.1"
+version = "1.2.2"
+
+import_folder = "~/Jottacloud/osm/bygninger/"  # Folder containing import building files (default folder tried first)
 
 
 class RelationMember(TypedDict):
@@ -620,6 +623,11 @@ def main():
 	municipalities = load_municipalities(session)
 	municipality_id, municipality_name, filename = get_municipality(arguments.input, municipalities)
 
+	if not os.path.isfile(filename):
+		test_filename = os.path.expanduser(import_folder + filename)
+		if os.path.isfile(test_filename):
+			filename = test_filename
+
 	with open(filename, 'r', encoding='utf-8') as file:
 		input_geojson: FeatureCollection = json.load(file)
 
@@ -697,4 +705,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-	
