@@ -13,7 +13,7 @@ except ImportError:
 	import xml.etree.ElementTree as etree
 
 
-version = "1.2.0"
+version = "1.2.1"
 
 
 class RelationMember(TypedDict):
@@ -121,11 +121,11 @@ def chunk(collection: Collection, n):
 		yield tuple(itertools.islice(iterator, n))
 
 
-# Area necessary to calculate mass center of a polygon with holes.
 def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord, float]:
+	"""Area is necessary to calculate mass center of a polygon with holes."""
 
 	if linear_ring[0] != linear_ring[-1]:
-#		linear_ring.append(linear_ring[0])
+		# linear_ring.append(linear_ring[0])
 		raise RuntimeError('linear ring not closed')
 
 	delta_x, delta_y = linear_ring[0]
@@ -149,8 +149,8 @@ def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord,
 	return center_point, abs(area)
 
 
-# Calculate mass centre of polygon
 def centroid_polygon(polygon: PolygonCoord) -> PointCoord:
+	"""Calculate mass centre of polygon"""
 	center_point, outer_area = centroid_area_linear_ring(polygon[0])
 	if inner_rings := polygon[1:]:
 		cx = center_point[0] * outer_area
@@ -184,11 +184,11 @@ def bboxes_for_multipolygon(multipolygon: MultipolygonCoord) -> List[Bbox]:
 	return [bbox_for_polygon(polygon) for polygon in multipolygon]
 
 
-# Ray tracing method
 def inside_linear_ring(point: PointCoord, linear_ring: LinearRingCoord):
+	"""Ray tracing method"""
 
 	if linear_ring[0] != linear_ring[-1]:
-#		linear_ring.append(linear_ring[0])
+		# linear_ring.append(linear_ring[0])
 		raise RuntimeError('linear ring not closed')
 
 	px, py = point
@@ -236,7 +236,6 @@ def osm_type_sorter(elements: Iterable[OsmElement]):
 	relations: Dict[int, Relation] = {}
 	ways: Dict[int, Way] = {}
 	nodes: Dict[int, Node] = {}
-	# Python 3.10 pattern matching ?
 	switch = {
 		"relation": relations,
 		"way": ways,
@@ -305,7 +304,6 @@ def polygon_assembler(
 
 	outer_way = []
 	inner_way = []
-	# Python 3.10 pattern matching !
 	switch = defaultdict(list, {
 		"": outer_way,
 		"outer": outer_way,
