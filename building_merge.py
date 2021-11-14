@@ -16,7 +16,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.6.0"
+version = "0.7.0"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -473,6 +473,22 @@ def load_osm_buildings(municipality_id):
 	message ("\t%i buildings loaded (%i elements)\n" % (len(osm_buildings), len(osm_elements)))
 	message ("\t%i buildings with tags other than building=*\n" % tag_count)
 
+	# Get top contributors
+
+	users = {}
+	for element in osm_elements:
+		if "tags" in element and "building" in element['tags']:
+			if element['user'] not in users:
+				users[ element['user'] ] = 0
+			users[ element['user'] ] += 1
+
+	sorted_users = sorted(users.items(), key=lambda x: x[1], reverse=True)
+
+	message ("\tTop contributors:\n")
+	for i, user in enumerate(sorted_users):
+		if user[1] > 10 and i < 10 or user[1] >= 100:
+			message ("\t\t%s (%i)\n" % (user[0], user[1]))
+
 
 
 # Create new node with given tag
@@ -659,19 +675,25 @@ def merge_buildings():
 
 	# Remove import buildings which have already been imported
 
-	message ("\tDiscover any earlier import ...\n")
-	
+	message ("\tDiscover any earlier import ... ")
+
 	import_refs = {}
 	for import_building in import_buildings:
 		import_refs[ import_building['properties']['ref:bygningsnr'] ] = import_building
 
+	count_existing = 0
 	for osm_building in osm_buildings:
 		if "ref:bygningsnr" in osm_building['tags']:
 			for ref in osm_building['tags']['ref:bygningsnr'].split(";"):
-				if ref in import_refs:
+				if ref in import_refs and import_refs[ref] in import_buildings:  # Support duplicate refs in OSM
 					import_buildings.remove(import_refs[ref])
+					count_existing += 1
+
+	message ("%i found\n" % count_existing)
 
 	# Loop osm buildings and attempt to find matching import buildings
+
+	message ("\tMatch buildings ...\n")
 
 	for osm_building in osm_buildings[:]:
 		count -= 1
@@ -867,8 +889,9 @@ if __name__ == '__main__':
 		sys.exit()
 
 	if len(sys.argv) > 2 and sys.argv[2].isdigit():
+		factor = margin_tagged / margin_hausdorff 
 		margin_hausdorff = int(sys.argv[2])
-		margin_tagged = margin_hausdorff * 0.5
+		margin_tagged = margin_hausdorff * factor
 
 	if "-debug" in sys.argv:
 		debug = True
