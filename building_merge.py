@@ -16,7 +16,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.7.0"
+version = "0.7.1"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -26,7 +26,7 @@ import_folder = "~/Jottacloud/osm/bygninger/"  # Folder containing import buildi
 
 margin_hausdorff = 10.0	# Maximum deviation between polygons (meters)
 margin_tagged = 5.0		# Maximum deviation between polygons if building is tagged (meters)
-margin_area = 0.5       # Max 50% difference of building areas
+margin_area = 0.4       # At least 40% equal building areas
 
 remove_addr = True 		# Remove addr tags from buildings
 
@@ -667,7 +667,7 @@ def merge_buildings():
 
 	message ("Merging buildings ...\n")
 	message ("\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n" % (margin_hausdorff, margin_tagged))
-	message ("\tMaximum area difference: %i %%\n" % (margin_area * 100))
+	message ("\tMaximum area difference: %i %%\n" % ((1 - margin_area) * 100))
 
 	count = len(osm_buildings)
 	count_merge = 0
