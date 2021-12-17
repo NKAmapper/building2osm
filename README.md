@@ -12,7 +12,7 @@ Usage:
 
 Parameters:
 * _municipality_ - Name of the municipality to generate. Output for several municipalities is generated if county name or "Norway" is given. 
-* <code>-split</code> - Also split output file into smaller subdivisions ("bydel" or post districts).
+* <code>-split</code> - Also split output file into smaller subdivisions ("bydel", electoral or post districts).
 * <code>-original</code> - Produce file without any modifications.
 * <code>-verify</code> - Include extra tags for verification of topology modificatons.
 * <code>-debug</code> - Include extra tags for debugging.
@@ -32,16 +32,17 @@ Parameters:
 
 ### municipality_split
 
-Splits the geojson import file into smaller subdivisions such as post districts or "bydel".
+Splits the geojson import file into smaller subdivisions such as electoral districts or "bydel".
 
 Usage:
-<code>python3 municipality_split.py \<municipality\> [ --subdivision [ bydel | postnummer ]</code>
+<code>python3 municipality_split.py \<municipality\> [ --subdivision [ bydel | valgkrets | postnummer ]</code>
  
 Parameter:
 * _municipality_ - Name of the municipality to split.
 * <code>--subdivision bydel</code> - Split municipality according to boroughs.
 * <code>--subdivision postnummer</code> - Split municipality according to post districts (please check for leftover buildings if post districts do not correspond exactly to municipality boundaries).
 * <code>--subdivision valgkrets</code> - Split municipality according to electoral districts (fewer than post districts in large towns).
+* <code>--area</code> - Also save district boundaries.
 
 ### Notes
 * Source data is from the Cadastral registry of Kartverket
