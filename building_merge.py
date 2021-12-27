@@ -16,7 +16,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.7.1"
+version = "0.7.2"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -387,6 +387,9 @@ def load_import_buildings(filename):
 		if "#672 " in building['properties']['TYPE'] or "#673 " in building['properties']['TYPE']:
 			building['properties']['building'] = "religious"
 
+		if "#199 " in building['properties']['TYPE']:
+			building['properties']['building'] = "residential"
+
 		if building['properties']['building'] == "barracks":
 			building['properties']['building'] = "container"
 		if building['properties']['building'] == "hotel" and "area" in building and building['area'] < 100:
@@ -665,6 +668,8 @@ def reverse_match(import_building):
 
 def merge_buildings():
 
+	global import_buildings
+
 	message ("Merging buildings ...\n")
 	message ("\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n" % (margin_hausdorff, margin_tagged))
 	message ("\tMaximum area difference: %i %%\n" % ((1 - margin_area) * 100))
@@ -672,24 +677,23 @@ def merge_buildings():
 	count = len(osm_buildings)
 	count_merge = 0
 	count_ref = 0
+	count_identical = 0
 
 	# Remove import buildings which have already been imported
 
 	message ("\tDiscover any earlier import ... ")
 
-	import_refs = {}
-	for import_building in import_buildings:
-		import_refs[ import_building['properties']['ref:bygningsnr'] ] = import_building
+	osm_refs = set()
+	for osm_element in osm_elements:
+		if "tags" in osm_element and "ref:bygningsnr" in osm_element['tags']:
+			for ref in osm_element['tags']['ref:bygningsnr'].split(";"):
+				osm_refs.add(ref)
 
-	count_existing = 0
-	for osm_building in osm_buildings:
-		if "ref:bygningsnr" in osm_building['tags']:
-			for ref in osm_building['tags']['ref:bygningsnr'].split(";"):
-				if ref in import_refs and import_refs[ref] in import_buildings:  # Support duplicate refs in OSM
-					import_buildings.remove(import_refs[ref])
-					count_existing += 1
+	count_import = len(import_buildings)
+	import_buildings = [building for building in import_buildings if building['properties']['ref:bygningsnr'] not in osm_refs]
+	count_existing = count_import - len(import_buildings)
 
-	message ("%i found\n" % count_existing)
+	message ("%i duplicate 'ref:bygningsnr' found\n" % count_existing)
 
 	# Loop osm buildings and attempt to find matching import buildings
 
@@ -721,6 +725,11 @@ def merge_buildings():
 				# Calculate Hausdorff distance to identify building with shortest distance
 				diff_haus = hausdorff_distance(osm_building['polygon'], import_building['geometry']['coordinates'][0])
 	
+				if diff_haus < 1.0:
+					count_identical += 1
+					if debug:
+						osm_building['tags']['IDENTICAL'] = " %.2f" % diff_haus
+
 				if diff_haus < best_diff:
 					found_building = import_building
 					best_diff = diff_haus
@@ -737,7 +746,7 @@ def merge_buildings():
 
 				if found_reverse == osm_building and reverse_haus < margin_hausdorff:
 
-					# Buildings 
+					# Compare building size
 					if margin_area < osm_building['area'] / found_building['area'] < 1.0 / margin_area:
 
 						add_building(found_building, osm_building)
@@ -760,6 +769,7 @@ def merge_buildings():
 	message ("\tRemaining %i buildings from OSM not merged (%i%%)\n" % \
 		(len(osm_buildings) - count_merge - count_ref, 100 - 100.0 * (count_merge + count_ref) / len(osm_buildings)))
 	message ("\tAdded %i new buildings from import file\n" % count_add)
+	message ("\t%i buildings had less than 1 meter offset\n" % count_identical)
 
 
 
