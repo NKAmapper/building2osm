@@ -74,7 +74,7 @@ class PolygonGeometry(TypedDict):
 
 
 class MultipolygonGeometry(TypedDict):
-	type: Literal['Multipolygon']
+	type: Literal['MultiPolygon']
 	coordinates: MultipolygonCoord
 
 
@@ -101,7 +101,7 @@ class Bbox(NamedTuple):
 
 
 city_with_bydel_id = {"0301", "1103", "3005", "4601", "5001"}
-osm_api = "https://overpass.kumi.systems/api/interpreter"
+overpass_endpoint = "https://overpass.kumi.systems/api/interpreter"
 query_template = """
 [out:json][timeout:40];
 (area[ref={}][admin_level=7][place=municipality];)->.a;
@@ -112,16 +112,30 @@ out skel qt;
 """
 
 
-def pairwise(iterable: Iterable):
+def pairwise(iterable: Iterable) -> Iterator:
 	a, b = itertools.tee(iterable)
 	next(b)
 	return zip(a, b)
 
 
-def chunk(collection: Collection, n):
+def chunk(collection: Collection, n: int) -> Iterator:
 	iterator = iter(collection)
 	for _ in range(len(collection) // n):
 		yield tuple(itertools.islice(iterator, n))
+
+
+def find_duplicates(iterable: Iterable, key_function) -> Iterator:
+	counter = {}
+	for i, e in enumerate(iterable):
+		value = key_function(e)
+		if value in counter:
+			counter[value].append(i)
+		else:
+			counter[value] = [i]
+
+	for indices in counter.values():
+		if len(indices) > 1:
+			yield indices
 
 
 def centroid_area_linear_ring(linear_ring: LinearRingCoord) -> Tuple[PointCoord, float]:
@@ -231,7 +245,7 @@ def inside_multipolygon(point: PointCoord, multipolygon: MultipolygonCoord, bbox
 
 def city_subdivisions_request(session: requests.Session, city_id: str):
 	params = {"data": query_template.format(city_id)}
-	response = session.get(osm_api, params=params)
+	response = session.get(overpass_endpoint, params=params)
 	return response.json()
 
 
@@ -322,7 +336,7 @@ def polygon_assembler(
 		for ring in linear_rings_assembler(outer_way)
 	]
 	if len(coordinates) > 1:
-		geometry_type = "Multipolygon"
+		geometry_type = "MultiPolygon"
 		coordinates = [[ring] for ring in coordinates]
 		if inner_way:
 			raise NotImplementedError("Simple feature multipolygons with inner ways not implemented yet")
@@ -374,7 +388,7 @@ def buildings_inside_subdivision(
 	if geometry_type == "Polygon":
 		inside_func = inside_polygon
 		bbox = bbox_for_polygon(coordinates)
-	elif geometry_type == "Multipolygon":
+	elif geometry_type == "MultiPolygon":
 		inside_func = inside_multipolygon
 		bbox = bboxes_for_multipolygon(coordinates)
 	else:
@@ -415,6 +429,8 @@ def electorate_request(
 		session: requests.Session, municipality_id: str
 ) -> etree.Element:
 
+	wfs_endpoint = 'https://wfs.geonorge.no/skwms1/services/wfs.stemmekretser'
+
 	wfs_filter = (
 		'<Filter>'
 			'<PropertyIsEqualTo>'
@@ -426,12 +442,16 @@ def electorate_request(
 		'</Filter>'
 	)
 
-	url = (
-		'https://wfs.geonorge.no/skwms1/services/wfs.stemmekretser?service=WFS&Version=2.0.0&request=GetFeature'
-		f'&typename=app:Stemmekrets&srsName=urn:ogc:def:crs:EPSG::4326&Filter={wfs_filter}'
-	)
+	params = {
+		'service': 'WFS',
+		'version': '2.0.0',
+		'request': 'GetFeature',
+		'typename': 'app:Stemmekrets',
+		'srsName': 'urn:ogc:def:crs:EPSG::4326',
+		'filter': wfs_filter
+	}
 
-	response = session.get(url)
+	response = session.get(wfs_endpoint, params=params)
 	tree = etree.ElementTree(etree.fromstring(response.content))
 	return tree.getroot()
 
@@ -482,7 +502,7 @@ def gml_surface_assembler(
 		patch = patches[0]
 		coordinates = gml_polygon_patch_assembler(patch, namespace, epsg)
 	else:
-		geometry_type = 'Multipolygon'
+		geometry_type = 'MultiPolygon'
 		coordinates = [gml_polygon_patch_assembler(patch, namespace, epsg) for patch in patches]
 
 	return {'type': geometry_type, 'coordinates': coordinates}
@@ -499,6 +519,7 @@ def gml_polygon_assembler(
 
 	return {'type': geometry_type, 'coordinates': coordinates}
 
+
 def gml_surface_property_type_assembler(
 		gml_surface_property_type: etree.Element,
 		namespace
@@ -514,6 +535,7 @@ def gml_surface_property_type_assembler(
 		return gml_surface_assembler(child, namespace)
 	else:
 		raise NotImplementedError(f"GML surface property type {child.tag} not implemented")
+
 
 def postcodes2features(gml_feature_collection: etree.Element) -> Iterator[Feature]:
 	namespace = {
@@ -556,6 +578,28 @@ def electorate2features(gml_feature_collection: etree.Element) -> Iterator[Featu
 			'electorate place': electorate_place
 		}
 		yield {'type': 'Feature', 'geometry': geometry, 'properties': properties}
+
+
+def merge_polygon(polygons: Iterable[PolygonGeometry]) -> MultipolygonGeometry:
+	coordinates = [polygon['coordinates'] for polygon in polygons]
+	return {'type': 'MultiPolygon', 'coordinates': coordinates}
+
+
+def electorate_merging(features: Sequence[Feature]) -> Iterable[Feature]:
+	key = lambda feature: feature['properties']['electorate code']
+	duplicates_indices = find_duplicates(features, key)
+	if not duplicates_indices:
+		return features
+
+	remove_indices = set()
+
+	for indices in duplicates_indices:
+		feature4merging = features[indices[0]]
+		geometries4merging = (features[index]['geometry'] for index in indices)
+		feature4merging['geometry'] = merge_polygon(geometries4merging)
+		remove_indices.update(indices[1:])
+
+	return (feature for i, feature in enumerate(features) if i not in remove_indices)
 
 
 def load_municipalities(session: requests.Session) -> Dict[str, str]:
@@ -620,6 +664,9 @@ def main():
 	arguments = get_arguments()
 
 	session = requests.Session()
+	session.headers.update({
+		'User-Agent': f'building2osm/split/{version} (https://github.com/NKAmapper/building2osm)'
+	})
 	municipalities = load_municipalities(session)
 	municipality_id, municipality_name, filename = get_municipality(arguments.input, municipalities)
 
@@ -656,14 +703,15 @@ def main():
 		subdivision_plural = 'valgkretser'
 		xml_root = electorate_request(session, municipality_id)
 		subdivisions = electorate2features(xml_root)
+		subdivisions = electorate_merging(list(subdivisions))
 		print("Loaded electoral districts")	
 
 	else:
 		raise RuntimeError(f'subdivision {arguments.subdivision} not known')
 
 	if arguments.save_area:
-		subdivisions = list(subdivisions)
 		geojson = features2geojson(subdivisions)
+		subdivisions = geojson['features']
 		filename = f'{subdivision_plural}_{municipality_id}_{municipality_name}.geojson'
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2, ensure_ascii=False)
@@ -681,7 +729,7 @@ def main():
 
 		filename = (
 			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
-			f'{arguments.subdivision}_{subdivision_name.replace(" ", "_").replace("/", "_").replace(",", "")}.geojson'
+			f'{arguments.subdivision}_{subdivision_name.replace(" ", "_").replace("/", "-").replace(",", "")}.geojson'
 		)
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2, ensure_ascii=False)
@@ -693,7 +741,7 @@ def main():
 		geojson = features2geojson(leftover_buildings)
 		filename = (
 			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
-			f'{arguments.subdivision.replace(" ", "_").replace("/", "_").replace(",", "")}_andre.geojson'
+			f'{arguments.subdivision.replace(" ", "_").replace("/", "-").replace(",", "")}_andre.geojson'
 		)
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2, ensure_ascii=False)
@@ -705,4 +753,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
