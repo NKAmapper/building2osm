@@ -74,7 +74,7 @@ class PolygonGeometry(TypedDict):
 
 
 class MultipolygonGeometry(TypedDict):
-	type: Literal['Multipolygon']
+	type: Literal['MultiPolygon']
 	coordinates: MultipolygonCoord
 
 
@@ -336,7 +336,7 @@ def polygon_assembler(
 		for ring in linear_rings_assembler(outer_way)
 	]
 	if len(coordinates) > 1:
-		geometry_type = "Multipolygon"
+		geometry_type = "MultiPolygon"
 		coordinates = [[ring] for ring in coordinates]
 		if inner_way:
 			raise NotImplementedError("Simple feature multipolygons with inner ways not implemented yet")
@@ -388,7 +388,7 @@ def buildings_inside_subdivision(
 	if geometry_type == "Polygon":
 		inside_func = inside_polygon
 		bbox = bbox_for_polygon(coordinates)
-	elif geometry_type == "Multipolygon":
+	elif geometry_type == "MultiPolygon":
 		inside_func = inside_multipolygon
 		bbox = bboxes_for_multipolygon(coordinates)
 	else:
@@ -502,7 +502,7 @@ def gml_surface_assembler(
 		patch = patches[0]
 		coordinates = gml_polygon_patch_assembler(patch, namespace, epsg)
 	else:
-		geometry_type = 'Multipolygon'
+		geometry_type = 'MultiPolygon'
 		coordinates = [gml_polygon_patch_assembler(patch, namespace, epsg) for patch in patches]
 
 	return {'type': geometry_type, 'coordinates': coordinates}
@@ -582,7 +582,7 @@ def electorate2features(gml_feature_collection: etree.Element) -> Iterator[Featu
 
 def merge_polygon(polygons: Iterable[PolygonGeometry]) -> MultipolygonGeometry:
 	coordinates = [polygon['coordinates'] for polygon in polygons]
-	return {'type': 'Multipolygon', 'coordinates': coordinates}
+	return {'type': 'MultiPolygon', 'coordinates': coordinates}
 
 
 def electorate_merging(features: Sequence[Feature]) -> Iterable[Feature]:
@@ -753,4 +753,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
