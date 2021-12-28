@@ -14,7 +14,7 @@ except ImportError:
 	import xml.etree.ElementTree as etree
 
 
-version = "1.2.2"
+version = "1.2.3"
 
 import_folder = "~/Jottacloud/osm/bygninger/"  # Folder containing import building files (default folder tried first)
 
@@ -729,7 +729,7 @@ def main():
 
 		filename = (
 			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
-			f'{arguments.subdivision}_{subdivision_name.replace(" ", "_").replace("/", "-")}.geojson'
+			f'{arguments.subdivision}_{subdivision_name.replace(" ", "_").replace("/", "-").replace(",", "")}.geojson'
 		)
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2, ensure_ascii=False)
@@ -741,7 +741,7 @@ def main():
 		geojson = features2geojson(leftover_buildings)
 		filename = (
 			f'bygninger_{municipality_id}_{municipality_name.replace(" ", "_")}_'
-			f'{arguments.subdivision}_andre.geojson'
+			f'{arguments.subdivision.replace(" ", "_").replace("/", "-").replace(",", "")}_andre.geojson'
 		)
 		with open(filename, 'w', encoding='utf-8') as file:
 			json.dump(geojson, file, indent=2, ensure_ascii=False)
@@ -753,3 +753,4 @@ def main():
 
 if __name__ == "__main__":
 	main()
+

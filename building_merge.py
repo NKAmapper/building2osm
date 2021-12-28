@@ -16,7 +16,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.6.0"
+version = "0.7.2"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -26,7 +26,7 @@ import_folder = "~/Jottacloud/osm/bygninger/"  # Folder containing import buildi
 
 margin_hausdorff = 10.0	# Maximum deviation between polygons (meters)
 margin_tagged = 5.0		# Maximum deviation between polygons if building is tagged (meters)
-margin_area = 0.5       # Max 50% difference of building areas
+margin_area = 0.4       # At least 40% equal building areas
 
 remove_addr = True 		# Remove addr tags from buildings
 
@@ -387,6 +387,9 @@ def load_import_buildings(filename):
 		if "#672 " in building['properties']['TYPE'] or "#673 " in building['properties']['TYPE']:
 			building['properties']['building'] = "religious"
 
+		if "#199 " in building['properties']['TYPE']:
+			building['properties']['building'] = "residential"
+
 		if building['properties']['building'] == "barracks":
 			building['properties']['building'] = "container"
 		if building['properties']['building'] == "hotel" and "area" in building and building['area'] < 100:
@@ -472,6 +475,22 @@ def load_osm_buildings(municipality_id):
 
 	message ("\t%i buildings loaded (%i elements)\n" % (len(osm_buildings), len(osm_elements)))
 	message ("\t%i buildings with tags other than building=*\n" % tag_count)
+
+	# Get top contributors
+
+	users = {}
+	for element in osm_elements:
+		if "tags" in element and "building" in element['tags']:
+			if element['user'] not in users:
+				users[ element['user'] ] = 0
+			users[ element['user'] ] += 1
+
+	sorted_users = sorted(users.items(), key=lambda x: x[1], reverse=True)
+
+	message ("\tTop contributors:\n")
+	for i, user in enumerate(sorted_users):
+		if user[1] > 10 and i < 10 or user[1] >= 100:
+			message ("\t\t%s (%i)\n" % (user[0], user[1]))
 
 
 
@@ -649,29 +668,36 @@ def reverse_match(import_building):
 
 def merge_buildings():
 
+	global import_buildings
+
 	message ("Merging buildings ...\n")
 	message ("\tMaximum Hausdorff difference: %i m (%i m for tagged buildings)\n" % (margin_hausdorff, margin_tagged))
-	message ("\tMaximum area difference: %i %%\n" % (margin_area * 100))
+	message ("\tMaximum area difference: %i %%\n" % ((1 - margin_area) * 100))
 
 	count = len(osm_buildings)
 	count_merge = 0
 	count_ref = 0
+	count_identical = 0
 
 	# Remove import buildings which have already been imported
 
-	message ("\tDiscover any earlier import ...\n")
-	
-	import_refs = {}
-	for import_building in import_buildings:
-		import_refs[ import_building['properties']['ref:bygningsnr'] ] = import_building
+	message ("\tDiscover any earlier import ... ")
 
-	for osm_building in osm_buildings:
-		if "ref:bygningsnr" in osm_building['tags']:
-			for ref in osm_building['tags']['ref:bygningsnr'].split(";"):
-				if ref in import_refs:
-					import_buildings.remove(import_refs[ref])
+	osm_refs = set()
+	for osm_element in osm_elements:
+		if "tags" in osm_element and "ref:bygningsnr" in osm_element['tags']:
+			for ref in osm_element['tags']['ref:bygningsnr'].split(";"):
+				osm_refs.add(ref)
+
+	count_import = len(import_buildings)
+	import_buildings = [building for building in import_buildings if building['properties']['ref:bygningsnr'] not in osm_refs]
+	count_existing = count_import - len(import_buildings)
+
+	message ("%i duplicate 'ref:bygningsnr' found\n" % count_existing)
 
 	# Loop osm buildings and attempt to find matching import buildings
+
+	message ("\tMatch buildings ...\n")
 
 	for osm_building in osm_buildings[:]:
 		count -= 1
@@ -699,6 +725,11 @@ def merge_buildings():
 				# Calculate Hausdorff distance to identify building with shortest distance
 				diff_haus = hausdorff_distance(osm_building['polygon'], import_building['geometry']['coordinates'][0])
 	
+				if diff_haus < 1.0:
+					count_identical += 1
+					if debug:
+						osm_building['tags']['IDENTICAL'] = " %.2f" % diff_haus
+
 				if diff_haus < best_diff:
 					found_building = import_building
 					best_diff = diff_haus
@@ -715,7 +746,7 @@ def merge_buildings():
 
 				if found_reverse == osm_building and reverse_haus < margin_hausdorff:
 
-					# Buildings 
+					# Compare building size
 					if margin_area < osm_building['area'] / found_building['area'] < 1.0 / margin_area:
 
 						add_building(found_building, osm_building)
@@ -738,6 +769,7 @@ def merge_buildings():
 	message ("\tRemaining %i buildings from OSM not merged (%i%%)\n" % \
 		(len(osm_buildings) - count_merge - count_ref, 100 - 100.0 * (count_merge + count_ref) / len(osm_buildings)))
 	message ("\tAdded %i new buildings from import file\n" % count_add)
+	message ("\t%i buildings had less than 1 meter offset\n" % count_identical)
 
 
 
@@ -867,8 +899,9 @@ if __name__ == '__main__':
 		sys.exit()
 
 	if len(sys.argv) > 2 and sys.argv[2].isdigit():
+		factor = margin_tagged / margin_hausdorff 
 		margin_hausdorff = int(sys.argv[2])
-		margin_tagged = margin_hausdorff * 0.5
+		margin_tagged = margin_hausdorff * factor
 
 	if "-debug" in sys.argv:
 		debug = True
