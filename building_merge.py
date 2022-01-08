@@ -370,34 +370,38 @@ def load_import_buildings(filename):
 	# Add polygon center and area
 
 	for building in import_buildings:
-		if building['geometry']['type'] == "Polygon" and len(building['geometry']['coordinates']) == 1:
+		try:
+			if building['geometry']['type'] == "Polygon" and len(building['geometry']['coordinates']) == 1:
 
-			building['center'] = polygon_center( building['geometry']['coordinates'][0] )
-			building['area'] = abs(polygon_area( building['geometry']['coordinates'][0] ))
-			if debug:
-				building['properties']['AREA'] = str(building['area'])
+				building['center'] = polygon_center( building['geometry']['coordinates'][0] )
+				building['area'] = abs(polygon_area( building['geometry']['coordinates'][0] ))
+				if debug:
+					building['properties']['AREA'] = str(building['area'])
 
-		if "STATUS" in building['properties']:
-			del building['properties']['STATUS']
-		if "DATE" in building['properties']:
-			del building['properties']['DATE']
+			if "STATUS" in building['properties']:
+				del building['properties']['STATUS']
+			if "DATE" in building['properties']:
+				del building['properties']['DATE']
 
-		# Temporary fixes
+			# Temporary fixes
 
-		if "#672 " in building['properties']['TYPE'] or "#673 " in building['properties']['TYPE']:
-			building['properties']['building'] = "religious"
+			if "#672 " in building['properties']['TYPE'] or "#673 " in building['properties']['TYPE']:
+				building['properties']['building'] = "religious"
 
-		if "#199 " in building['properties']['TYPE']:
-			building['properties']['building'] = "residential"
+			if "#199 " in building['properties']['TYPE']:
+				building['properties']['building'] = "residential"
 
-		if building['properties']['building'] == "barracks":
-			building['properties']['building'] = "container"
-		if building['properties']['building'] == "hotel" and "area" in building and building['area'] < 100:
-			building['properties']['building'] = "cabin"
-		if building['properties']['building'] in ["garage", "barn"] and "area" in building and building['area'] < 15:
-			building['properties']['building'] = "shed"
-		if building['properties']['building'] == "barn" and "area" in building and building['area'] < 100:
-			building['properties']['building'] = "farm_auxiliary"
+			if building['properties']['building'] == "barracks":
+				building['properties']['building'] = "container"
+			if building['properties']['building'] == "hotel" and "area" in building and building['area'] < 100:
+				building['properties']['building'] = "cabin"
+			if building['properties']['building'] in ["garage", "barn"] and "area" in building and building['area'] < 15:
+				building['properties']['building'] = "shed"
+			if building['properties']['building'] == "barn" and "area" in building and building['area'] < 100:
+				building['properties']['building'] = "farm_auxiliary"
+		except Exception as e:
+			print("Exception when handling building:", str(building))
+			raise e
 
 
 	message ("\t%i buildings loaded\n" % len(import_buildings))
