@@ -16,7 +16,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree as ET
 
 
-version = "0.7.2"
+version = "0.8.0"
 
 request_header = {"User-Agent": "building2osm/" + version}
 
@@ -70,35 +70,6 @@ def format_decimal(number):
 		return number.rstrip("0").rstrip(".")
 	else:
 		return ""
-
-
-# Compute approximation of distance between two coordinates, (lat,lon), in meters
-# Works for short distances
-
-def distance (point1, point2):
-
-	lon1, lat1, lon2, lat2 = map(math.radians, [point1[0], point1[1], point2[0], point2[1]])
-	x = (lon2 - lon1) * math.cos( 0.5*(lat2+lat1) )
-	y = lat2 - lat1
-	return 6371000.0 * math.sqrt( x*x + y*y )  # Metres
-
-
-
-# Compute approximation of distance between two coordinates, (lat,lon), in meters
-# Works for short distances
-
-def distance2 (point1, point2):
-
-	lon1, lat1, lon2, lat2 = map(math.radians, [point1[0], point1[1], point2[0], point2[1]])
-
-	dlon = lon2 - lon1
-	dlat = lat2 - lat1
-
-	a = math.sin( dlat / 2 ) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin( dlon / 2 ) ** 2
-	c = 2 * math.atan2( math.sqrt(a), math.sqrt(1 - a) )
-
-	return 6371000.0 * c  # Metres
-
 
 
 # Compute closest distance from point p3 to line segment [s1, s2].
@@ -370,6 +341,11 @@ def load_import_buildings(filename):
 	# Add polygon center and area
 
 	for building in import_buildings:
+
+		if "building" not in building['properties']:
+			message("\t*** No building tag: %s\n" % (json.dumps(building, ensure_ascii=False)))
+			continue
+
 		if building['geometry']['type'] == "Polygon" and len(building['geometry']['coordinates']) == 1:
 
 			building['center'] = polygon_center( building['geometry']['coordinates'][0] )
@@ -384,11 +360,12 @@ def load_import_buildings(filename):
 
 		# Temporary fixes
 
-		if "#672 " in building['properties']['TYPE'] or "#673 " in building['properties']['TYPE']:
-			building['properties']['building'] = "religious"
+		if "TYPE" in building['properties']:
+			if "#672 " in building['properties']['TYPE'] or "#673 " in building['properties']['TYPE']:
+				building['properties']['building'] = "religious"
 
-		if "#199 " in building['properties']['TYPE']:
-			building['properties']['building'] = "residential"
+			if "#199 " in building['properties']['TYPE']:
+				building['properties']['building'] = "residential"
 
 		if building['properties']['building'] == "barracks":
 			building['properties']['building'] = "container"
@@ -690,7 +667,8 @@ def merge_buildings():
 				osm_refs.add(ref)
 
 	count_import = len(import_buildings)
-	import_buildings = [building for building in import_buildings if building['properties']['ref:bygningsnr'] not in osm_refs]
+	import_buildings = [building for building in import_buildings \
+		if "ref:bygningsnr" not in building['properties'] or building['properties']['ref:bygningsnr'] not in osm_refs]
 	count_existing = count_import - len(import_buildings)
 
 	message ("%i duplicate 'ref:bygningsnr' found\n" % count_existing)
@@ -759,7 +737,7 @@ def merge_buildings():
 
 	count_add = 0
 	for building in import_buildings:
-		if building['geometry']['type'] == "Polygon":
+		if building['geometry']['type'] == "Polygon" and "building" in building['properties']:
 			add_building(building, None)
 			count_add += 1
 
