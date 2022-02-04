@@ -14,7 +14,7 @@ except ImportError:
 	import xml.etree.ElementTree as etree
 
 
-version = "1.2.3"
+version = "1.3.0"
 
 import_folder = "~/Jottacloud/osm/bygninger/"  # Folder containing import building files (default folder tried first)
 
@@ -656,7 +656,7 @@ def get_arguments() -> argparse.Namespace:
 	parser = argparse.ArgumentParser()
 	parser.add_argument('input', help="municipality name, kode or filename from building2osm")
 	parser.add_argument('-s', '--subdivision', choices=['bydel', 'postnummer', 'valgkrets'])
-	parser.add_argument('-a', '--area', dest='save_area', action='store_true', help="saves areas as geojson",)
+	parser.add_argument('-a', '--area', dest='save_area', action='store_true', help="only saves areas as geojson",)
 	return parser.parse_args()
 
 
@@ -665,25 +665,19 @@ def main():
 
 	session = requests.Session()
 	session.headers.update({
-		'User-Agent': f'building2osm/split/{version} (https://github.com/NKAmapper/building2osm)'
+		'User-Agent': f'building2osm/split/{version}'
 	})
+
+	# Get municipality
+
 	municipalities = load_municipalities(session)
 	municipality_id, municipality_name, filename = get_municipality(arguments.input, municipalities)
+	print(f'\nMunicipality: "{municipality_name}"\n')
 
-	if not os.path.isfile(filename):
-		test_filename = os.path.expanduser(import_folder + filename)
-		if os.path.isfile(test_filename):
-			filename = test_filename
-
-	with open(filename, 'r', encoding='utf-8') as file:
-		input_geojson: FeatureCollection = json.load(file)
-
-	buildings = input_geojson['features']
-
-	print(f'\nLoaded {len(buildings)} buildings from "{filename}"\n')
+	# Create subdivision polygons
 
 	if not arguments.subdivision:
-		arguments.subdivision = 'bydel' if municipality_id in city_with_bydel_id else 'postnummer'
+		arguments.subdivision = 'bydel' if municipality_id in city_with_bydel_id else 'valgkrets'
 
 	if arguments.subdivision == 'bydel':
 		if municipality_id not in city_with_bydel_id:
@@ -709,16 +703,35 @@ def main():
 	else:
 		raise RuntimeError(f'subdivision {arguments.subdivision} not known')
 
+	# Output subdivision polygons
+
+	geojson = features2geojson(subdivisions)
+	subdivisions = geojson['features']
+	out_filename = f'{subdivision_plural}_{municipality_id}_{municipality_name}.geojson'
+	with open(out_filename, 'w', encoding='utf-8') as file:
+		json.dump(geojson, file, indent=2, ensure_ascii=False)
+	print(f'Saved subdivision areas to "{out_filename}"\n')
+
 	if arguments.save_area:
-		geojson = features2geojson(subdivisions)
-		subdivisions = geojson['features']
-		filename = f'{subdivision_plural}_{municipality_id}_{municipality_name}.geojson'
-		with open(filename, 'w', encoding='utf-8') as file:
-			json.dump(geojson, file, indent=2, ensure_ascii=False)
-		print(f'\tSaved area to "{filename}"')
+		return
 
-	print(f'\nSplitting municipality into {subdivision_plural}')
+	# Load buildings
 
+	if not os.path.isfile(filename):
+		test_filename = os.path.expanduser(import_folder + filename)
+		if os.path.isfile(test_filename):
+			filename = test_filename
+
+	with open(filename, 'r', encoding='utf-8') as file:
+		input_geojson: FeatureCollection = json.load(file)
+
+	buildings = input_geojson['features']
+
+	print(f'Loaded {len(buildings)} buildings from "{filename}"\n')
+
+	# Split buildings into subdivisions and output
+
+	print(f'Splitting municipality into {subdivision_plural}')
 
 	imported_refs = set()
 	for subdivision in subdivisions:
