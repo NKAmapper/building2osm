@@ -40,9 +40,9 @@ Usage:
 Parameter:
 * _municipality_ - Name of the municipality to split.
 * <code>--subdivision bydel</code> - Split municipality according to boroughs.
-* <code>--subdivision postnummer</code> - Split municipality according to post districts (please check for leftover buildings if post districts do not correspond exactly to municipality boundaries).
-* <code>--subdivision valgkrets</code> - Split municipality according to electoral districts (fewer than post districts in large towns).
-* <code>--area</code> - Also save district boundaries.
+* <code>--subdivision postnummer</code> - Split municipality according to post districts.
+* <code>--subdivision valgkrets</code> - Split municipality according to electoral districts (fewer than post districts in large towns; default).
+* <code>--area</code> - Save district boundaries only (no split). Default is to save boundary file when splitting.
 
 ### Notes
 * Source data is from the Cadastral registry of Kartverket
@@ -66,6 +66,7 @@ Parameter:
     3) Check _OSM_BUILDING_ for manual retagging of building types.
     4) Check untouched existing OSM buildings.
     5) Check if entrances or other tagged nodes needs to be reconnected to the new buildings (search for <code>type:node ways:0 -untagged</code>).
+  * Use the boundary polygons from _municipality_split.py_ and the JOSM functions _Selection->All inside_ and _Edit->Purge_ to work on a subset of a large municipality.
   * The _building_merge.py_ program may be run several times for the same municipality. Only buildings with new _ref:bygningsnr_ will be added each time.
 
 ### References
