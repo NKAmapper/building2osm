@@ -14,7 +14,7 @@ except ImportError:
 	import xml.etree.ElementTree as etree
 
 
-version = "1.3.0"
+version = "1.3.1"
 
 import_folder = "~/Jottacloud/osm/bygninger/"  # Folder containing import building files (default folder tried first)
 
@@ -647,7 +647,7 @@ def get_municipality(parameter: str, municipalities: Dict[str, str]):
 				raise RuntimeError(f'Municipality {parameter} not found, or ambiguous')
 
 		municipality_name = municipalities[municipality_id]
-		filename = f'bygninger_{municipality_id:4}_{municipality_name}.geojson'
+		filename = f'bygninger_{municipality_id:4}_{municipality_name}.geojson'.replace(" ", "_")
 
 	return municipality_id, municipality_name, filename
 
@@ -707,7 +707,7 @@ def main():
 
 	geojson = features2geojson(subdivisions)
 	subdivisions = geojson['features']
-	out_filename = f'{subdivision_plural}_{municipality_id}_{municipality_name}.geojson'
+	out_filename = f'{subdivision_plural}_{municipality_id}_{municipality_name}.geojson'.replace(" ", "_")
 	with open(out_filename, 'w', encoding='utf-8') as file:
 		json.dump(geojson, file, indent=2, ensure_ascii=False)
 	print(f'Saved subdivision areas to "{out_filename}"\n')
