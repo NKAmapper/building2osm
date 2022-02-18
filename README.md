@@ -44,6 +44,19 @@ Parameter:
 * <code>--subdivision valgkrets</code> - Split municipality according to electoral districts (fewer than post districts in large towns; default).
 * <code>--area</code> - Save district boundaries only (no split). Default is to save boundary file when splitting.
 
+### filter_buildings
+
+Filters the geojson import file, removing buildings that have already been
+imported.
+
+Usage:
+<code>python3 filter_buildings.py --municipality \<id\> --input \<geojson\> --output \<geojson\></code>
+
+Parameters:
+* <code>--municipality id</code> - Municipality code to use for downloading
+* <code>--input geojson</code> - Path to the input geojson file
+* <code>--output geojson</code> - Path to the output geojson file
+
 ### Notes
 * Source data is from the Cadastral registry of Kartverket
   * "INSPIRE Buildings Core2d" - Contains polygons of the building footprints.
