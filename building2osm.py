@@ -596,7 +596,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 	# Namespace
 
 	ns_gml = 'http://www.opengis.net/gml/3.2'
-	ns_app = 'http://skjema.geonorge.no/SOSI/produktspesifikasjon/Matrikkelen-Bygningspunkt'
+	ns_app = 'http://skjema.geonorge.no/SOSI/produktspesifikasjon/Matrikkelen-Bygningspunkt/20211101'
 
 	ns = {
 			'gml': ns_gml,
