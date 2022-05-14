@@ -653,8 +653,13 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 
 		building_type = building.find("app:bygningstype", ns).text
 		building_status = building.find("app:bygningsstatus", ns).text
-		source_date = building.find("app:oppdateringsdato", ns).text
 		heritage = building.find("app:harKulturminne", ns).text
+
+		source_date_node = building.find("app:oppdateringsdato", ns)
+		if source_date_node is not None:
+			source_date = source_date_node.text
+		else:
+			source_date = None
 
 #		registration = building.find("app:opprinnelse", ns)  # Not useful
 #		if registration is not None:
@@ -676,7 +681,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 				'ref:bygningsnr': ref,
 				'TYPE': "#" + building_type,
 				'STATUS': "#%s %s" % (building_status, status_codes[ building_status ]),
-				'DATE': source_date[:10]
+				'DATE': source_date[:10] if source_date else 'N/A'
 			},
 			'centre': centre
 		}
