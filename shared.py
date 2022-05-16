@@ -19,14 +19,15 @@ def run_overpass_query(query):
     return request.text
 
 
-def load_building_tags(municipality_id):
+def load_building_tags(municipality_id, with_position=False):
+    center = 'center' if with_position else ''
     query = f'''[out:json][timeout:60];
                 (area[ref={municipality_id}]
                      [admin_level=7]
                      [place=municipality];
                 ) -> .county;
                 nwr["ref:bygningsnr"](area.county);
-                out tags noids;
+                out tags noids {center};
              '''
     return run_overpass_query(query)
 
