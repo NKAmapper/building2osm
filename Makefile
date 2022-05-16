@@ -3,7 +3,10 @@
 
 FLAKE8_FILES := \
 		filter_buildings.py \
+		find_lifecycle_updates.py \
+		shared.py \
 		tests/test_filter.py \
+		tests/test_find_lifecycle_updates.py \
 		;
 
 
