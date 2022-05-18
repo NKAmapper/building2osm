@@ -41,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--municipality', required=True, type=int)
+    parser.add_argument('--municipality', required=True)
     args = parser.parse_args()
 
     with open(args.input, 'r', encoding='utf-8') as file:
