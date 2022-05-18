@@ -23,7 +23,9 @@ from xml.etree import ElementTree as ET
 import utm  # From building2osm on GitHub
 
 
-version = "0.6.2"
+version = "0.7.0"
+
+polygons = False 			# Load building polygons (currently unavailable from Kartverket)
 
 verbose = False				# Provides extra messages about polygon loading
 
@@ -150,35 +152,6 @@ def polygon_centre (polygon):
 		x += node[0]
 		y += node[1]
 	return (x / length, y / length)
-
-
-
-# Tests whether point (x,y) is inside a polygon
-# Ray tracing method
-
-def inside_polygon (point, polygon):
-
-	if polygon[0] == polygon[-1]:
-		x, y = point
-		n = len(polygon)
-		inside = False
-
-		p1x, p1y = polygon[0]
-		for i in range(n):
-			p2x, p2y = polygon[i]
-			if y > min(p1y, p2y):
-				if y <= max(p1y, p2y):
-					if x <= max(p1x, p2x):
-						if p1y != p2y:
-							xints = (y-p1y) * (p2x-p1x) / (p2y-p1y) + p1x
-						if p1x == p2x or x <= xints:
-							inside = not inside
-			p1x, p1y = p2x, p2y
-
-		return inside
-
-	else:
-		return False
 
 
 
@@ -653,23 +626,6 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 
 		building_type = building.find("app:bygningstype", ns).text
 		building_status = building.find("app:bygningsstatus", ns).text
-		heritage = building.find("app:harKulturminne", ns).text
-
-		source_date_node = building.find("app:oppdateringsdato", ns)
-		if source_date_node is not None:
-			source_date = source_date_node.text
-		else:
-			source_date = None
-
-#		registration = building.find("app:opprinnelse", ns)  # Not useful
-#		if registration is not None:
-#			registration = registration.text
-
-		sefrak = building.find("app:sefrakIdent/app:SefrakIdent", ns)
-		if sefrak is not None:
-			sefrak = "%s-%s-%s" % (sefrak.find("app:sefrakKommune", ns).text,
-									sefrak.find("app:registreringskretsnummer", ns).text,
-									sefrak.find("app:huslopenummer", ns).text)
 
 		feature = {
 			"type": "Feature",
@@ -680,8 +636,7 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 			"properties": {
 				'ref:bygningsnr': ref,
 				'TYPE': "#" + building_type,
-				'STATUS': "#%s %s" % (building_status, status_codes[ building_status ]),
-				'DATE': source_date[:10] if source_date else 'N/A'
+				'STATUS': "#%s %s" % (building_status, status_codes[ building_status ])
 			},
 			'centre': centre
 		}
@@ -693,11 +648,27 @@ def load_building_info(municipality_id, municipality_name, neighbour):
 		elif building_type not in not_found:
 			not_found.append(building_type)
 
+		source_date = building.find("app:oppdateringsdato", ns)
+		if source_date is not None:
+			feature['properties']['DATE'] = source_date.text[:10]
+
+		heritage = building.find("app:harKulturminne", ns).text
 		if heritage == "true":
 			feature['properties']['heritage'] = "yes"
 
-		if sefrak:
+		sefrak = building.find("app:sefrakIdent/app:SefrakIdent", ns)
+		if sefrak is not None:
+			sefrak = "%s-%s-%s" % (sefrak.find("app:sefrakKommune", ns).text,
+									sefrak.find("app:registreringskretsnummer", ns).text,
+									sefrak.find("app:huslopenummer", ns).text)
 			feature['properties']['SEFRAK'] = sefrak
+
+		# Establish link to all "bruksenhet" associated with building, for later updating building levels
+
+		for dwelling in building.findall("app:bruksenhet", ns):
+			dwelling_id = dwelling.find("app:Bruksenhet/app:bruksenhetId", ns)
+			if dwelling_id is not None:
+				dwellings[ dwelling_id.text ] = feature
 
 		if debug:
 			feature['properties']['DEBUG_CENTRE'] = str(centre[1]) + " " + str(centre[0])
@@ -734,47 +705,6 @@ def load_neighbour_buildings(municipality_id):
 
 
 
-# Identify the closest building (if any) and add levels tag
-
-def assign_levels_to_building(main_levels, roof_levels, point):
-
-	# Calculate bbox for search
-
-	min_lat = point[1] - addr_margin / 111500.0
-	max_lat = point[1] + addr_margin / 111500.0
-	min_lon = point[0] - addr_margin / (math.cos(math.radians(min_lat)) * 111320.0)
-	max_lon = point[0] + addr_margin / (math.cos(math.radians(max_lat)) * 111320.0)
-
-	# Loop buildings to identify closest building
-
-	found_ref = None
-	for ref, building in iter(buildings.items()):
-		if min_lon < building['centre'][0] < max_lon and min_lat < building['centre'][1] < max_lat:
-			if building['geometry']['type'] == "Polygon" and \
-					building['properties']['building'] in ['apartments', 'residential', 'dormitory', 'terrace', 'semidetached_house', \
-															'civic', 'commercial', 'retail', 'office', 'house', 'farm', 'cabin'] and \
-					inside_polygon(point, building['geometry']['coordinates'][0]):
-				found_ref = ref
-				break
-
-	# If found, add levels tags
-
-	if found_ref:
-		building = buildings[found_ref]
-		if "building:levels" in building['properties'] and main_levels != int(building['properties']['building:levels']):
-			building['properties']['building:levels'] = str(max(main_levels, int(building['properties']['building:levels'])))
-			building['properties']['DEBUG_LEVELS'] = building['properties']['building:levels']
-		else:	
-			building['properties']['building:levels'] = str(main_levels)
-
-		if roof_levels > 0:
-			if "roof:levels" in building['properties']:
-				building['properties']['roof:levels'] = str(max(roof_levels, int(building['properties']['roof:levels'])))
-			else:
-				building['properties']['roof:levels'] = str(roof_levels)
-
-
-
 # Load building level information from cadastral registry.
 # Only for apartments.
 
@@ -799,40 +729,43 @@ def load_building_levels(municipality_id, municipality_name):
 	csv_file = zip_file.open(zip_file.namelist()[1])
 	addr_table = csv.DictReader(TextIOWrapper(csv_file, "utf-8"), delimiter=";")
 
-	address = None
-	count = 0
-
 	for row in addr_table:
+		if row['bruksenhetId'] in dwellings:
+			building = dwellings[ row['bruksenhetId'] ]
 
-		if row['adresseId'] != address:
+			if "levels" not in building:
+				building['levels'] = {
+					'H': 0,  # Main levels, all above ground
+					'U': 0,  # Main levels, above ground on at least one side
+					'K': 0,  # Underground levels
+					'L': 0   # Roof levels
+				}
 
-			# Assign levels to building and get ready for next building
-			if address:
-				if levels['H'] + levels['U'] > 1:
-					assign_levels_to_building(levels['H'] + levels['U'], levels['L'], point)
-					count += 1
-					message ("\r\t%i " % count)
+			# Update highest level if available
 
-			address = row['adresseId']
-			point = (float(row['Øst']), float(row['Nord']))
-			levels = {
-				'H': 0,  # Main levels, all above ground
-				'U': 0,  # Main levels, above ground on at least one side
-				'K': 0,  # Underground levels
-				'L': 0   # Roof levels
-			}
-
-		# Count levels if available
-
-		level = row['bruksenhetsnummerTekst'][:3]
-		if level:
-			levels[ level[0] ] = max(levels[ level[0] ], int(level[1:]))
-
-	message ("\r\tFound %i buildings with level information (>1 levels)\n" % count)
+			if row['bruksenhetsnummerTekst']:
+				level_type = row['bruksenhetsnummerTekst'][0]
+				level_number = int(row['bruksenhetsnummerTekst'][1:3])
+				building['levels'][ level_type ] = max(building['levels'][ level_type ], level_number)
 
 	csv_file.close()
 	zip_file.close()
 	in_file.close()
+	count = 0
+
+	for building in buildings.values():
+		if "levels" in building:
+			if  building['levels']['H'] + building['levels']['U'] > 1:
+#				if building['properties']['building'] in ['apartments', 'residential', 'dormitory', 'terrace', 'semidetached_house', \
+#															'civic', 'commercial', 'retail', 'office', 'house', 'farm', 'cabin'] :	
+				building['properties']['building:levels'] = str(building['levels']['H'] + building['levels']['U'])
+				if building['levels']['L'] > 0:
+					building['properties']['roof:levels'] = str(building['levels']['L'])
+				count += 1
+
+			del building['levels']
+
+	message ("\tFound %i buildings with level information (>1 levels)\n" % count)
 
 
 
@@ -1374,7 +1307,7 @@ def save_file(municipality_id, municipality_name):
 			if not debug:
 				for key in list(building['properties'].keys()):
 					if key == key.upper() and key not in ['TYPE', 'STATUS', 'DATE'] and \
-							not(verify and "VERIFY" in key)  and not(original and key == "SEFRAK"):
+							not(verify and "VERIFY" in key) and not(original and key == "SEFRAK"):
 						del building['properties'][key]
 			features['features'].append(building)
 
@@ -1409,16 +1342,21 @@ def process_municipality(municipality_id, municipality_name):
 
 	buildings.clear()
 	neighbour_buildings.clear()
+	dwellings.clear()
 	remove_nodes.clear()
 
 	count = load_building_info(municipality_id, municipality_name, neighbour=False)
 
 	if count > 0:
-		load_neighbour_buildings(municipality_id)
-		load_coordinates_municipality(municipality_id)
+		if polygons:
+			load_neighbour_buildings(municipality_id)
+			load_coordinates_municipality(municipality_id)
+		else:
+			message ("Building polygons not available\n")
+
 		load_building_levels(municipality_id, municipality_name)
 
-		if not original:
+		if polygons and not original:
 			rectify_buildings()
 			simplify_buildings()
 
@@ -1435,14 +1373,17 @@ def process_municipality(municipality_id, municipality_name):
 if __name__ == '__main__':
 
 	start_time = time.time()
-	message ("\n*** buildings2osm v%s ***\n\n" % version)
+	message ("\n*** building2osm v%s ***\n\n" % version)
 
 	municipalities = {}
 	building_types = {}
 	buildings = {}
 	neighbour_buildings = []
+	dwellings = {}
 	remove_nodes = set()
 	failed_runs = []
+
+	addr = {}
 
 	# Parse parameters
 
