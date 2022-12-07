@@ -14,7 +14,7 @@ Parameters:
 * _municipality_ - Name of the municipality to generate. Output for several municipalities is generated if county name or "Norway" is given. 
 * <code>-split</code> - Also split output file into smaller subdivisions ("bydel", electoral or post districts).
 * <code>-original</code> - Produce file without any modifications.
-* <code>-verify</code> - Include extra tags for verification of topology modificatons.
+* <code>-verify</code> - Include extra tags for verification of topology modifications.
 * <code>-debug</code> - Include extra tags for debugging.
 
 ### building_merge
@@ -26,7 +26,7 @@ Usage:
 
 Parameters:
 * _municipality_ - Name of the municipality to conflate.
-* _max distance_ - Optional maximum Hausdorff distance between matched buildings. Default value is 10 metres (5 metres is the building is tagged).
+* _max distance_ - Optional maximum Hausdorff distance between matched buildings. Default value is 10 metres (5 metres if the building is tagged).
 * _filename.geojson_ - Optional input file in geojson format. If not specified, the import file for the municipality will be loaded (it must be present in the default folder or in a predefined folder).
 * <code>-debug</code> - Include extra tags for debugging.
 
@@ -71,7 +71,7 @@ Parameters:
 * The _building_merge.py_ program conflates the import buildings with existing buildings in OSM.
   * New buildings are loaded from the geojson import file. You may split the import file into smaller parts using _municipality_split.py_ or manually.
   * Existing buildings are loaded from OSM.
-  * New and existing buildings which are each other's best match within the given maximum Hausdorff distance (default 10 metres) are automatically conflated. They also need to have similar size (default 50% difference).
+  * New and existing buildings which are each other's best match within the given maximum Hausdorff distance (default 10 metres) are automatically conflated. They also need to have similar size (default up to 50% difference).
   * The _OSM_BUILDING_ tag will show which building tag was used by the existing building, unless they are in similar residential/commercial/farm categories.
   * Use the To-do plugin in JOSM to:
     1) Resolve _Overlapping buildings_. 
