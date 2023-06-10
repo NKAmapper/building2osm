@@ -76,11 +76,13 @@ def main():
     parser.add_argument('--municipality', required=True)
     args = parser.parse_args()
 
+    muni_id = shared.handle_municipality_argument(args.municipality)
+
     with open(args.input, 'r', encoding='utf-8') as file:
         cadastral = shared.parse_cadastral_data(file.read())
     print(f'Loaded {len(cadastral)} buildings')
 
-    osm_raw = shared.load_building_tags(args.municipality)
+    osm_raw = shared.load_building_tags(muni_id)
     osm_buildings = json.loads(osm_raw)['elements']
     osm_by_ref = osm_buildings_by_ref(osm_buildings)
     print(f'Loaded {len(osm_buildings)} buildings from OSM')

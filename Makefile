@@ -9,6 +9,7 @@ FLAKE8_FILES := \
 		tests/test_filter.py \
 		tests/test_find_lifecycle_updates.py \
 		tests/test_find_removed.py \
+		tests/test_shared.py \
 		;
 
 
