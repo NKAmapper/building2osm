@@ -1,5 +1,7 @@
 # building2osm
-Generates import files for OpenStreetMap with buliding footprints from Kartverket.
+Generates import files for OpenStreetMap in Norway with buliding footprints from Kartverket.
+
+For Sweden, see [building2osm-sweden](https://github.com/NKAmapper/building2osm-sweden).
 
 ### building2osm
 
